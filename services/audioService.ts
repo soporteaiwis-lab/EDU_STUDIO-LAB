@@ -34,7 +34,7 @@ class AudioService {
       octaves: 2,
       oscillator: { type: 'sine' }
     }).toDestination();
-    this.metronomeSynth.volume.value = -10;
+    this.metronomeSynth.volume.value = -5; // Slightly louder
 
     // Recorder Setup
     this.recorder = new Tone.Recorder();
@@ -51,7 +51,7 @@ class AudioService {
 
   setTime(seconds: number) {
     Tone.Transport.seconds = seconds;
-    // Reset beat counter approximation based on time
+    // Reset beat counter based on time for metronome sync
     const spb = 60 / this.bpm;
     this.currentBeat = Math.floor(seconds / spb);
   }
@@ -60,21 +60,25 @@ class AudioService {
     if (enabled) {
       if (!this.metronomeLoop) {
         this.metronomeLoop = new Tone.Loop((time) => {
-          // Simple 4/4 accent logic
+          // 4/4 Logic: Beat 0 is High, 1,2,3 are Low
           const beat = this.currentBeat % 4;
           if (beat === 0) {
-            this.metronomeSynth?.triggerAttackRelease("G5", "32n", time, 1.0); // High Click (Downbeat)
+            // Downbeat (Strong)
+            this.metronomeSynth?.triggerAttackRelease("C6", "32n", time, 1.0); 
           } else {
-            this.metronomeSynth?.triggerAttackRelease("C5", "32n", time, 0.6); // Low Click
+            // Upbeat (Weak)
+            this.metronomeSynth?.triggerAttackRelease("C5", "32n", time, 0.5); 
           }
           this.currentBeat++;
         }, "4n");
       }
-      this.currentBeat = 0; // Reset on start
+      // Calculate current beat based on current transport time to ensure sync on resume
+      const spb = 60 / this.bpm;
+      this.currentBeat = Math.floor(Tone.Transport.seconds / spb);
+      
       this.metronomeLoop.start(0);
     } else {
       this.metronomeLoop?.stop();
-      this.currentBeat = 0;
     }
   }
 

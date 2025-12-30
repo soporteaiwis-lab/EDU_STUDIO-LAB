@@ -61,6 +61,11 @@ export interface GeneratedLyrics {
   content: string;
 }
 
+export interface SongData {
+  lyrics: string;
+  chords: string[]; // Simplification for now
+}
+
 export enum EffectType {
   NONE = 'NONE',
   REVERB_BATHROOM = 'REVERB_BATHROOM',

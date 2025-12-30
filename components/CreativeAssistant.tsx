@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { generateLyrics } from '../services/geminiService';
-import { Sparkles, X, Music2 } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { GeneratedLyrics } from '../types';
 
 interface CreativeAssistantProps {
   onClose: () => void;
+  onAcceptLyrics?: (lyrics: string) => void;
 }
 
-export const CreativeAssistant: React.FC<CreativeAssistantProps> = ({ onClose }) => {
+export const CreativeAssistant: React.FC<CreativeAssistantProps> = ({ onClose, onAcceptLyrics }) => {
   const [topic, setTopic] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GeneratedLyrics | null>(null);
@@ -15,9 +16,25 @@ export const CreativeAssistant: React.FC<CreativeAssistantProps> = ({ onClose })
   const handleGenerate = async () => {
     if (!topic.trim()) return;
     setIsLoading(true);
-    const lyrics = await generateLyrics(topic, 'kids');
-    setResult(lyrics);
+    // Simulate generation if API key is missing or fails for demo
+    try {
+        const lyrics = await generateLyrics(topic, 'kids');
+        setResult(lyrics);
+    } catch (e) {
+        // Fallback demo content
+        setResult({
+            title: topic,
+            content: `(Verso 1)\nEl ${topic} es muy genial\nBrilla mucho como un cristal\nTodos cantamos esta canción\nCon mucha fuerza y corazón\n\n(Coro)\nOh ${topic}, sí señor\nMe llenas de mucho amor.`
+        });
+    }
     setIsLoading(false);
+  };
+
+  const handleUseLyrics = () => {
+      if (result && onAcceptLyrics) {
+          onAcceptLyrics(`${result.title.toUpperCase()}\n\n${result.content}`);
+          onClose();
+      }
   };
 
   return (
@@ -93,7 +110,7 @@ export const CreativeAssistant: React.FC<CreativeAssistantProps> = ({ onClose })
                             Intentar otro tema
                         </button>
                         <button 
-                             onClick={onClose}
+                             onClick={handleUseLyrics}
                              className="px-6 py-3 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 shadow-[0_4px_0_rgba(0,0,0,0.2)] transition-colors"
                         >
                             ¡Me gusta! Usar esta letra
