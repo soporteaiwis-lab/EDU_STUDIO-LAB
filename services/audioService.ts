@@ -1,14 +1,16 @@
 import * as Tone from 'tone';
-import { EffectType } from '../types';
+import { EffectType, ChordEvent } from '../types';
 
 interface ChannelStrip {
-  player: Tone.Player;
+  player?: Tone.Player; // For Audio Tracks
+  synth?: Tone.PolySynth; // For MIDI/Chord Tracks
   panner: Tone.Panner;
   eq: Tone.EQ3;
   volume: Tone.Volume;
   reverb: Tone.Reverb;
   pitchShift: Tone.PitchShift;
   node: Tone.Channel;
+  type: 'AUDIO' | 'INSTRUMENT';
 }
 
 class AudioService {
@@ -17,10 +19,22 @@ class AudioService {
   private recorder: Tone.Recorder | null = null;
   private metronomeLoop: Tone.Loop | null = null;
   private metronomeSynth: Tone.MembraneSynth | null = null;
+  private chordPart: Tone.Part | null = null;
   
   public bpm: number = 120;
   private isInitialized: boolean = false;
   private currentBeat: number = 0;
+
+  // Simple Chord Dictionary
+  private chordMap: Record<string, string[]> = {
+      'C': ['C4', 'E4', 'G4'], 'Cm': ['C4', 'Eb4', 'G4'], 'C7': ['C4', 'E4', 'G4', 'Bb4'],
+      'D': ['D4', 'F#4', 'A4'], 'Dm': ['D4', 'F4', 'A4'], 'D7': ['D4', 'F#4', 'A4', 'C5'],
+      'E': ['E4', 'G#4', 'B4'], 'Em': ['E4', 'G4', 'B4'], 'E7': ['E4', 'G#4', 'B4', 'D5'],
+      'F': ['F4', 'A4', 'C5'], 'Fm': ['F4', 'Ab4', 'C5'], 'G': ['G3', 'B3', 'D4'],
+      'Gm': ['G3', 'Bb3', 'D4'], 'G7': ['G3', 'B3', 'D4', 'F4'],
+      'A': ['A3', 'C#4', 'E4'], 'Am': ['A3', 'C4', 'E4'], 'Am7': ['A3', 'C4', 'E4', 'G4'],
+      'B': ['B3', 'D#4', 'F#4'], 'Bm': ['B3', 'D4', 'F#4']
+  };
 
   constructor() {
     // Singleton
@@ -28,24 +42,20 @@ class AudioService {
 
   async initialize() {
     if (this.isInitialized && Tone.context.state === 'running') return;
-    
     await Tone.start();
     
     if (!this.isInitialized) {
-        // Setup Metronome
+        // Metronome
         this.metronomeSynth = new Tone.MembraneSynth({
-          pitchDecay: 0.008,
-          octaves: 2,
-          oscillator: { type: 'sine' }
+          pitchDecay: 0.008, octaves: 2, oscillator: { type: 'sine' }
         }).toDestination();
-        this.metronomeSynth.volume.value = -5;
+        this.metronomeSynth.volume.value = -10;
 
-        // Recorder Setup
+        // Recorder
         this.recorder = new Tone.Recorder();
         this.mic = new Tone.UserMedia();
         
         this.isInitialized = true;
-        console.log("Audio Engine Initialized");
     }
   }
 
@@ -65,31 +75,26 @@ class AudioService {
       if (!this.metronomeLoop) {
         this.metronomeLoop = new Tone.Loop((time) => {
           const beat = this.currentBeat % 4;
-          if (beat === 0) {
-            this.metronomeSynth?.triggerAttackRelease("C6", "32n", time, 1.0); 
-          } else {
-            this.metronomeSynth?.triggerAttackRelease("C5", "32n", time, 0.5); 
-          }
+          this.metronomeSynth?.triggerAttackRelease(beat === 0 ? "C6" : "C5", "32n", time);
           this.currentBeat++;
         }, "4n");
       }
-      const spb = 60 / this.bpm;
-      this.currentBeat = Math.floor(Tone.Transport.seconds / spb);
       this.metronomeLoop.start(0);
     } else {
       this.metronomeLoop?.stop();
     }
   }
 
-  // --- Core Audio Logic ---
+  // --- Track Management ---
 
-  async addTrack(id: string, url: string): Promise<void> {
+  async addTrack(id: string, urlOrType: string, isInstrument: boolean = false): Promise<void> {
     await this.initialize();
     
-    // Dispose existing track if updating
+    // Cleanup existing
     if (this.channels.has(id)) {
         const c = this.channels.get(id);
-        c?.player.dispose();
+        c?.player?.dispose();
+        c?.synth?.dispose();
         c?.reverb.dispose();
         c?.pitchShift.dispose();
         c?.eq.dispose();
@@ -98,100 +103,93 @@ class AudioService {
         this.channels.delete(id);
     }
 
-    return new Promise((resolve, reject) => {
-      const player = new Tone.Player({
-        url: url,
-        loop: false,
-        autostart: false,
-        onload: () => {
-            // FX Chain Nodes
-            const pitchShift = new Tone.PitchShift({ pitch: 0 });
-            const eq = new Tone.EQ3(0, 0, 0);
-            const panner = new Tone.Panner(0);
-            const volume = new Tone.Volume(0);
-            const reverb = new Tone.Reverb({ decay: 2.5, wet: 0 }); // Wet starts at 0
-            const channel = new Tone.Channel({ volume: 0, pan: 0 }).toDestination();
+    const eq = new Tone.EQ3(0, 0, 0);
+    const panner = new Tone.Panner(0);
+    const volume = new Tone.Volume(0);
+    const reverb = new Tone.Reverb({ decay: 2.5, wet: 0 }); 
+    const pitchShift = new Tone.PitchShift({ pitch: 0 });
+    const channel = new Tone.Channel({ volume: 0, pan: 0 }).toDestination();
 
-            // Chain Construction: Player -> Pitch -> EQ -> Panner -> Volume -> Reverb -> Channel
-            // Note: In real production we might want Reverb as a Send, but for simplicity/Insert style:
-            player.chain(pitchShift, eq, panner, volume, reverb, channel);
+    // Chain: Source -> Pitch -> EQ -> Panner -> Volume -> Reverb -> Channel
+    
+    if (isInstrument) {
+        // SYNTH TRACK (Chords/MIDI)
+        const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.05, decay: 0.1, sustain: 0.3, release: 1 }
+        });
+        synth.chain(pitchShift, eq, panner, volume, reverb, channel);
+        this.channels.set(id, { synth, eq, panner, volume, reverb, pitchShift, node: channel, type: 'INSTRUMENT' });
 
-            this.channels.set(id, { player, eq, panner, volume, reverb, pitchShift, node: channel });
-            player.sync().start(0);
-            resolve();
-        },
-        onerror: (e) => {
-            console.error("Error loading audio", e);
-            reject(e);
-        }
-      });
-    });
+    } else {
+        // AUDIO TRACK
+        return new Promise((resolve, reject) => {
+            const player = new Tone.Player({
+                url: urlOrType,
+                loop: false,
+                autostart: false,
+                onload: () => {
+                    player.chain(pitchShift, eq, panner, volume, reverb, channel);
+                    this.channels.set(id, { player, eq, panner, volume, reverb, pitchShift, node: channel, type: 'AUDIO' });
+                    player.sync().start(0);
+                    resolve();
+                },
+                onerror: (e) => reject(e)
+            });
+        });
+    }
+  }
+
+  // --- CHORD LOGIC ---
+
+  getNotesForChord(chordName: string): string[] {
+      // Basic normalization to handle "Cmaj7" -> "C" approx if needed, 
+      // but for now direct lookup
+      return this.chordMap[chordName] || this.chordMap[chordName.replace('maj', '')] || ['C4']; 
+  }
+
+  previewChord(chordName: string) {
+      if(!this.isInitialized) this.initialize();
+      const synth = new Tone.PolySynth().toDestination();
+      synth.volume.value = -10;
+      const notes = this.getNotesForChord(chordName);
+      synth.triggerAttackRelease(notes, "0.5");
+      // Cleanup
+      setTimeout(() => synth.dispose(), 1000);
+  }
+
+  scheduleChords(trackId: string, chords: ChordEvent[]) {
+     // 1. Find the synth for this track
+     const ch = this.channels.get(trackId);
+     if (!ch || !ch.synth) return;
+
+     // 2. Create a Part
+     if (this.chordPart) {
+         this.chordPart.dispose();
+     }
+
+     const events = chords.map(c => ({
+         time: `${c.bar - 1}:0:0`, // Bar:Quarter:Sixteenth
+         chordName: c.name,
+         duration: `${c.duration}m` // measures
+     }));
+
+     this.chordPart = new Tone.Part((time, value) => {
+         const notes = this.getNotesForChord(value.chordName);
+         ch.synth?.triggerAttackRelease(notes, value.duration, time);
+     }, events).start(0);
   }
 
   // --- Effects Control ---
 
   setReverb(id: string, amount: number) {
       const ch = this.channels.get(id);
-      if (ch) {
-          // Amount 0-1. 
-          ch.reverb.wet.value = amount;
-      }
+      if (ch) ch.reverb.wet.value = amount;
   }
 
   setPitch(id: string, semiTones: number) {
       const ch = this.channels.get(id);
-      if (ch) {
-          ch.pitchShift.pitch = semiTones;
-      }
-  }
-
-  getWaveformPath(id: string, width: number, height: number): string {
-    const channel = this.channels.get(id);
-    if (!channel || !channel.player.loaded) return "";
-    try {
-        const buffer = channel.player.buffer;
-        const data = buffer.getChannelData(0); 
-        const step = Math.ceil(data.length / width);
-        const amp = height / 2;
-        let path = `M 0 ${amp} `;
-        for (let i = 0; i < width; i++) {
-          let min = 1.0;
-          let max = -1.0;
-          for (let j = 0; j < step; j++) {
-            const datum = data[(i * step) + j];
-            if (datum < min) min = datum;
-            if (datum > max) max = datum;
-          }
-          path += `L ${i} ${(1 + min) * amp} `;
-          path += `L ${i} ${(1 + max) * amp} `;
-        }
-        return path;
-    } catch (e) {
-        return "";
-    }
-  }
-
-  // --- Transport ---
-
-  play() {
-    if (Tone.context.state !== 'running') Tone.context.resume();
-    if (Tone.Transport.state !== 'started') {
-      Tone.Transport.start();
-    }
-  }
-
-  pause() {
-    Tone.Transport.pause();
-  }
-
-  stop() {
-    Tone.Transport.stop();
-    Tone.Transport.seconds = 0;
-    this.currentBeat = 0;
-  }
-
-  getCurrentTime(): number {
-    return Tone.Transport.seconds;
+      if (ch) ch.pitchShift.pitch = semiTones;
   }
 
   setVolume(id: string, value: number) {
@@ -226,31 +224,47 @@ class AudioService {
      if (ch) ch.node.solo = solo;
   }
 
-  // --- Recording ---
+  // --- Helper ---
+  getWaveformPath(id: string, width: number, height: number): string {
+    const channel = this.channels.get(id);
+    if (!channel || !channel.player || !channel.player.loaded) return "";
+    try {
+        const buffer = channel.player.buffer;
+        const data = buffer.getChannelData(0); 
+        const step = Math.ceil(data.length / width);
+        const amp = height / 2;
+        let path = `M 0 ${amp} `;
+        for (let i = 0; i < width; i++) {
+          let min = 1.0; let max = -1.0;
+          for (let j = 0; j < step; j++) {
+            const datum = data[(i * step) + j];
+            if (datum < min) min = datum;
+            if (datum > max) max = datum;
+          }
+          path += `L ${i} ${(1 + min) * amp} `;
+          path += `L ${i} ${(1 + max) * amp} `;
+        }
+        return path;
+    } catch (e) { return ""; }
+  }
 
-  async startRecording(): Promise<void> {
+  // --- Transport / Recording wrappers (same as before) ---
+  play() { if (Tone.context.state !== 'running') Tone.context.resume(); Tone.Transport.start(); }
+  pause() { Tone.Transport.pause(); }
+  stop() { Tone.Transport.stop(); Tone.Transport.seconds = 0; this.currentBeat = 0; }
+  getCurrentTime() { return Tone.Transport.seconds; }
+  
+  async startRecording() {
     await this.initialize();
-    
-    if (Tone.context.state !== 'running') {
-        await Tone.context.resume();
-    }
-
+    if (Tone.context.state !== 'running') await Tone.context.resume();
     if (this.mic && this.recorder) {
-      try {
-          await this.mic.open();
-          this.mic.disconnect(); 
-          this.mic.connect(this.recorder);
-          this.recorder.start();
-      } catch (e) {
-          console.error("Microphone access denied or error", e);
-          throw e;
-      }
-    } else {
-        throw new Error("Audio Engine not initialized properly");
+      await this.mic.open();
+      this.mic.connect(this.recorder);
+      this.recorder.start();
     }
   }
 
-  async stopRecording(): Promise<string | null> {
+  async stopRecording() {
     if (this.recorder && this.mic && this.recorder.state === 'started') {
       const recording = await this.recorder.stop();
       this.mic.close();
@@ -263,9 +277,7 @@ class AudioService {
     const recorder = new Tone.Recorder();
     Tone.Destination.connect(recorder);
     recorder.start();
-    Tone.Transport.stop();
-    Tone.Transport.seconds = 0;
-    Tone.Transport.start();
+    Tone.Transport.stop(); Tone.Transport.seconds = 0; Tone.Transport.start();
     return new Promise((resolve) => {
         setTimeout(async () => {
             const recording = await recorder.stop();
