@@ -3,13 +3,13 @@ import { TrackBlock } from './TrackBlock';
 import { Mixer } from './Mixer';
 import { Inspector } from './Inspector';
 import { Browser } from './Browser';
-import { LyricsPanel } from './LyricsPanel';
+import { SongbookPanel } from './SongbookPanel';
 import { TimelineRuler } from './TimelineRuler';
 import { CreativeEditor } from './CreativeEditor';
 import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
-import { Track, UserMode, MetronomeConfig, GeneratedChords, GeneratedRhythm, GeneratedMelody } from '../types';
-import { Play, Square, Sparkles, Home, Download, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save } from 'lucide-react';
+import { Track, UserMode, SongMetadata, GeneratedChords, GeneratedRhythm, GeneratedMelody } from '../types';
+import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save } from 'lucide-react';
 
 interface StudioProps {
   userMode: UserMode;
@@ -25,10 +25,20 @@ const INITIAL_TRACKS: Track[] = [
   },
 ];
 
+const INITIAL_METADATA: SongMetadata = {
+    title: 'Nueva Canción',
+    author: 'Usuario AIWIS',
+    key: 'C',
+    bpm: 120,
+    lyrics: ''
+};
+
 const HEADER_WIDTH = 256; 
 
 export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
+  const [metadata, setMetadata] = useState<SongMetadata>(INITIAL_METADATA);
+  
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState('Mi Proyecto');
   const [sessionId, setSessionId] = useState(Date.now().toString());
@@ -44,10 +54,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [showMixer, setShowMixer] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
-  const [showLyrics, setShowLyrics] = useState(false);
+  const [showSongbook, setShowSongbook] = useState(false);
   const [showCreative, setShowCreative] = useState(false);
 
-  const [lyricsContent, setLyricsContent] = useState('');
   const [bpm, setBpm] = useState(120);
   
   const isPro = userMode === UserMode.PRO;
@@ -64,7 +73,10 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     return () => { audioService.stop(); }
   }, []);
 
-  useEffect(() => { audioService.setBpm(bpm); }, [bpm]);
+  useEffect(() => { 
+      audioService.setBpm(bpm); 
+      setMetadata(prev => ({...prev, bpm}));
+  }, [bpm]);
 
   useEffect(() => {
     const animate = () => {
@@ -84,7 +96,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     if (isPlaying) { 
         audioService.pause(); 
     } else { 
-        // Schedule all generative tracks
         tracks.forEach(t => {
             if (t.type === 'CHORD' && t.chordData) audioService.scheduleChords(t.id, t.chordData);
             if ((t.type === 'RHYTHM' || t.type === 'DRUMS') && t.rhythmData) audioService.scheduleDrums(t.id, t.rhythmData);
@@ -112,45 +123,44 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     }
   };
 
-  // --- AI IMPORTERS ---
+  // --- AI IMPORTERS (UPDATES METADATA & TRACKS) ---
   const handleImportLyrics = (text: string) => {
-      setLyricsContent(prev => prev + (prev ? '\n\n' : '') + text);
-      setShowLyrics(true);
+      setMetadata(prev => ({ ...prev, lyrics: prev.lyrics + (prev.lyrics ? '\n\n' : '') + text }));
+      setShowSongbook(true);
   };
   const handleImportChords = (data: GeneratedChords) => {
       const id = Date.now().toString();
-      const track: Track = { 
-          id, name: `Acordes (${data.key})`, type: 'CHORD', instrument: 'CHORD', color: 'bg-blue-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, chordData: data.progression 
-      };
+      const track: Track = { id, name: `Acordes (${data.key})`, type: 'CHORD', instrument: 'CHORD', color: 'bg-blue-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, chordData: data.progression };
       setTracks(prev => [...prev, track]);
+      setMetadata(prev => ({...prev, chords: data, key: data.key})); // Save to metadata
       audioService.addTrack(id, '', 'INSTRUMENT');
   };
   const handleImportRhythm = (data: GeneratedRhythm) => {
       const id = Date.now().toString();
-      const track: Track = {
-          id, name: `Batería (${data.style})`, type: 'RHYTHM', instrument: 'DRUMS', color: 'bg-red-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, rhythmData: data.events
-      };
+      const track: Track = { id, name: `Batería (${data.style})`, type: 'RHYTHM', instrument: 'DRUMS', color: 'bg-red-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, rhythmData: data.events };
       setTracks(prev => [...prev, track]);
+      setMetadata(prev => ({...prev, rhythm: data})); // Save to metadata
       audioService.addTrack(id, '', 'DRUMS');
   };
   const handleImportMelody = (data: GeneratedMelody) => {
       const id = Date.now().toString();
-      const track: Track = {
-          id, name: `Melodía (${data.key})`, type: 'MELODY', instrument: 'KEYS', color: 'bg-yellow-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, melodyData: data.events
-      };
+      const track: Track = { id, name: `Melodía (${data.key})`, type: 'MELODY', instrument: 'KEYS', color: 'bg-yellow-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, melodyData: data.events };
       setTracks(prev => [...prev, track]);
+      setMetadata(prev => ({...prev, melody: data})); // Save to metadata
       audioService.addTrack(id, '', 'INSTRUMENT');
   };
 
   // --- GENERIC ACTIONS ---
   const handleSaveSession = () => {
-      storageService.saveSession({ id: sessionId, name: sessionName, lastModified: Date.now(), bpm, tracks });
-      alert('Proyecto guardado en tu nube local.');
+      storageService.saveSession({ id: sessionId, name: sessionName, lastModified: Date.now(), bpm, tracks, metadata: {...metadata, title: sessionName} });
+      alert('Proyecto y Cancionero guardados.');
   };
 
   const handleLoadSession = (session: any) => {
       handleStop();
       setSessionId(session.id); setSessionName(session.name); setBpm(session.bpm); setTracks(session.tracks);
+      if(session.metadata) setMetadata(session.metadata);
+      
       session.tracks.forEach((t: Track) => {
          if(t.type === 'AUDIO' && t.audioUrl) audioService.addTrack(t.id, t.audioUrl, 'AUDIO');
          else if(t.type === 'RHYTHM' || t.type === 'DRUMS') audioService.addTrack(t.id, '', 'DRUMS');
@@ -218,9 +228,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
              </div>
              <div className="flex-1"></div>
              <div className="flex items-center space-x-2 border-l border-gray-500/30 pl-4">
-                 <button onClick={() => setShowMixer(!showMixer)} className={`p-1.5 rounded ${showMixer ? 'bg-blue-600 text-white' : 'text-gray-500'}`}><PanelBottom size={18}/></button>
-                 <button onClick={() => {setShowBrowser(false); setShowLyrics(!showLyrics);}} className={`p-1.5 rounded ${showLyrics ? 'bg-gray-600 text-white' : 'text-gray-500'}`}><BookOpen size={18}/></button>
-                 <button onClick={() => {setShowLyrics(false); setShowBrowser(!showBrowser);}} className={`p-1.5 rounded ${showBrowser ? 'bg-gray-600 text-white' : 'text-gray-500'}`}><Grid size={18}/></button>
+                 <button onClick={() => setShowMixer(!showMixer)} className={`p-1.5 rounded ${showMixer ? 'bg-blue-600 text-white' : 'text-gray-500'}`} title="Mezclador"><PanelBottom size={18}/></button>
+                 <button onClick={() => {setShowBrowser(false); setShowSongbook(!showSongbook);}} className={`p-1.5 rounded ${showSongbook ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Cancionero"><BookOpen size={18}/></button>
+                 <button onClick={() => {setShowSongbook(false); setShowBrowser(!showBrowser);}} className={`p-1.5 rounded ${showBrowser ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Biblioteca"><Grid size={18}/></button>
              </div>
         </div>
 
@@ -245,8 +255,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
             </div>
             {showBrowser && <Browser mode={userMode} onImport={(u,n,t)=> {if(t==='AUDIO') { const id=Date.now().toString(); setTracks(p=>[...p, {id, name:n, type:'AUDIO', instrument:'VOCAL', color:'bg-green-500', volume:80, pan:0, eq:{low:0,mid:0,high:0}, effects:{reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, audioUrl:u}]); audioService.addTrack(id, u, 'AUDIO'); }}} onLoadSession={handleLoadSession} onClose={() => setShowBrowser(false)} />}
-            {showLyrics && <LyricsPanel mode={userMode} content={lyricsContent} onUpdateContent={setLyricsContent} onClose={() => setShowLyrics(false)} />}
+            
+            {/* SONGBOOK PANEL replaces LyricsPanel */}
+            {showSongbook && <SongbookPanel mode={userMode} metadata={metadata} onUpdateLyrics={(text) => setMetadata(prev=>({...prev, lyrics: text}))} onClose={() => setShowSongbook(false)} />}
         </div>
+        
+        {/* Creative Editor */}
         {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={handleImportLyrics} onImportChords={handleImportChords} onImportRhythm={handleImportRhythm} onImportMelody={handleImportMelody} />}
     </div>
   );

@@ -1,8 +1,7 @@
-
 export enum UserMode {
-  EXPLORER = 'EXPLORER', // 7-10 years (Lego blocks, no timeline)
-  MAKER = 'MAKER',       // 11-14 years (Colorful, simplified DAW)
-  PRO = 'PRO'            // 15+ years (Dark, Cubase-style, full features)
+  EXPLORER = 'EXPLORER',
+  MAKER = 'MAKER',
+  PRO = 'PRO'
 }
 
 export enum UserRole {
@@ -11,7 +10,7 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '1.2',
+  version: '1.3',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
@@ -24,28 +23,28 @@ export interface TrackEQ {
 }
 
 export interface TrackEffects {
-  reverb: number; // 0 to 1 (wet/dry)
-  pitch: number;  // -12 to +12 semitones
-  distortion: number; // 0 to 1
+  reverb: number;
+  pitch: number;
+  distortion: number;
 }
 
 export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'MELODY' | 'UNKNOWN';
 
 export interface ChordEvent {
-  bar: number; // Bar number (1-based)
-  name: string; // e.g., "Cmaj7"
-  duration: number; // in bars
+  bar: number;
+  name: string;
+  duration: number;
 }
 
 export interface DrumEvent {
-  time: string; // "0:0:0"
+  time: string;
   instrument: 'KICK' | 'SNARE' | 'HIHAT';
 }
 
 export interface MelodyEvent {
-  note: string; // "C4"
-  duration: string; // "4n"
-  time: string; // "0:0:0"
+  note: string;
+  duration: string;
+  time: string;
 }
 
 export interface Track {
@@ -68,19 +67,25 @@ export interface Track {
   melodyData?: MelodyEvent[];
 }
 
+// NEW: Stores the creative "DNA" of the song for the Songbook
+export interface SongMetadata {
+  lyrics: string;
+  chords?: GeneratedChords;
+  melody?: GeneratedMelody;
+  rhythm?: GeneratedRhythm;
+  key: string;
+  bpm: number;
+  title: string;
+  author: string;
+}
+
 export interface MetronomeConfig {
   enabled: boolean;
   bpm: number;
-  timeSignature: [number, number]; // e.g., [4, 4]
+  timeSignature: [number, number];
   countIn: boolean;
   clickSound: 'BEEP' | 'WOODBLOCK' | 'COWBELL';
   volume: number;
-}
-
-export interface ExportConfig {
-  format: 'WAV' | 'MP3';
-  quality: '128k' | '320k' | '16bit' | '24bit';
-  range: 'ENTIRE_PROJECT' | 'LOOP_REGION';
 }
 
 export interface Session {
@@ -89,6 +94,7 @@ export interface Session {
   lastModified: number;
   bpm: number;
   tracks: Track[];
+  metadata?: SongMetadata; // Added metadata persistence
 }
 
 export interface GeneratedLyrics {
