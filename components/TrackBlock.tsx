@@ -67,10 +67,10 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
       <div className="w-full h-full flex items-center p-4 bg-gray-900/50">
           <button 
             onMouseDown={(e) => { e.stopPropagation(); audioService.triggerSampler(track.id); }}
-            className="w-32 h-full bg-orange-500 rounded-lg shadow-lg border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex flex-col items-center justify-center text-white font-bold hover:bg-orange-400 transition-all"
+            className="w-40 h-full bg-orange-500 rounded-lg shadow-lg border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex flex-col items-center justify-center text-white font-bold hover:bg-orange-400 transition-all"
           >
               <Zap size={20} className="mb-1"/>
-              TRIGGER
+              LANZAR SFX
           </button>
           <div className="ml-4 flex-1 h-12 bg-black/40 rounded flex items-center justify-center relative overflow-hidden">
                {waveformPath && <svg height="100%" width="100%" preserveAspectRatio="none"><path d={waveformPath} fill="none" stroke="#f97316" strokeWidth="2" /></svg>}
@@ -92,11 +92,38 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
   if (mode === UserMode.EXPLORER) {
       return (
         <div className={`flex w-full ${containerClass} ${track.color} overflow-hidden relative shrink-0`}>
-            <div className={`w-64 ${stickyHeaderStyle} bg-black/10 backdrop-blur-sm flex flex-col items-center justify-center border-r-4 border-white/20 p-2 flex-shrink-0`}>
-                <div className="bg-white/20 p-3 rounded-full mb-1">{getIcon()}</div>
-                <h3 className="font-fredoka text-xl font-bold text-white shadow-sm truncate w-full text-center">{track.name}</h3>
-                <button onClick={() => onDelete(track.id)} className="p-2 rounded-full bg-white/20 text-white mt-2 hover:bg-red-500"><Trash2 size={20}/></button>
+            {/* Header Basic Mode */}
+            <div className={`w-72 ${stickyHeaderStyle} bg-black/10 backdrop-blur-sm flex flex-col items-center justify-center border-r-4 border-white/20 p-2 flex-shrink-0 relative`}>
+                <div className="flex w-full items-center justify-between px-2 mb-1">
+                    <div className="bg-white/20 p-2 rounded-full">{getIcon()}</div>
+                    
+                    {/* REC BUTTON FOR BASIC */}
+                    {track.type !== 'CHORD' && (
+                        <button 
+                            onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
+                            className={`p-3 rounded-full border-4 shadow-sm transition-all ${track.isArmed ? 'bg-red-500 border-red-200 animate-pulse text-white' : 'bg-gray-200 border-gray-300 text-gray-400 hover:bg-gray-300'}`}
+                            title="GRABAR AQUÍ"
+                        >
+                            <CircleDot size={24} fill={track.isArmed ? "white" : "transparent"}/>
+                        </button>
+                    )}
+                </div>
+
+                <h3 className="font-fredoka text-lg font-bold text-white shadow-sm truncate w-full text-center mb-1">{track.name}</h3>
+                
+                {/* VOLUME SLIDER FOR BASIC */}
+                <div className="w-full px-2 flex items-center space-x-2">
+                    <Music size={12} className="text-white"/>
+                    <input 
+                        type="range" min="0" max="100" value={track.volume} 
+                        onChange={(e) => onVolumeChange(track.id, parseInt(e.target.value))}
+                        className="w-full h-2 rounded-lg appearance-none bg-white/30 cursor-pointer"
+                    />
+                </div>
+
+                <button onClick={() => onDelete(track.id)} className="absolute top-2 right-2 p-1.5 rounded-full bg-white/20 text-white hover:bg-red-500/80 transition-colors"><Trash2 size={16}/></button>
             </div>
+            
             <div className="flex-1 relative flex items-center bg-black/5 min-w-[800px]" ref={containerRef}>
                 {track.type === 'CHORD' ? renderChordContent() : track.type === 'SAMPLER' ? renderSamplerContent() : renderAudioContent()}
             </div>

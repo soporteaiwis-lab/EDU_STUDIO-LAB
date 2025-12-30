@@ -107,7 +107,7 @@ class AudioService {
     await this.initialize();
     
     if (this.channels.has(id)) {
-        this.disposeTrack(id);
+        this.removeTrack(id);
     }
     
     // Common Chain
@@ -182,19 +182,23 @@ class AudioService {
       }
   }
 
-  private disposeTrack(id: string) {
+  // Changed from private to public so Studio.tsx can call it when deleting tracks
+  public removeTrack(id: string) {
       const c = this.channels.get(id);
-      c?.player?.dispose();
-      c?.sampler?.dispose();
-      c?.synth?.dispose();
-      c?.drumSampler?.dispose();
-      c?.reverb.dispose();
-      c?.pitchShift.dispose();
-      c?.eq.dispose();
-      c?.panner.dispose();
-      c?.node.dispose();
-      this.channels.delete(id);
+      if (c) {
+          c.player?.stop(); c.player?.dispose();
+          c.sampler?.stop(); c.sampler?.dispose();
+          c.synth?.dispose();
+          c.drumSampler?.dispose();
+          c.reverb.dispose();
+          c.pitchShift.dispose();
+          c.eq.dispose();
+          c.panner.dispose();
+          c.node.dispose();
+          this.channels.delete(id);
+      }
       if(this.activeParts.has(id)) {
+        this.activeParts.get(id)?.stop();
         this.activeParts.get(id)?.dispose();
         this.activeParts.delete(id);
     }
