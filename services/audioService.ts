@@ -6,6 +6,8 @@ interface ChannelStrip {
   panner: Tone.Panner;
   eq: Tone.EQ3;
   volume: Tone.Volume;
+  reverb: Tone.Reverb;
+  pitchShift: Tone.PitchShift;
   node: Tone.Channel;
 }
 
@@ -86,8 +88,13 @@ class AudioService {
     
     // Dispose existing track if updating
     if (this.channels.has(id)) {
-        this.channels.get(id)?.player.dispose();
-        this.channels.get(id)?.node.dispose();
+        const c = this.channels.get(id);
+        c?.player.dispose();
+        c?.reverb.dispose();
+        c?.pitchShift.dispose();
+        c?.eq.dispose();
+        c?.panner.dispose();
+        c?.node.dispose();
         this.channels.delete(id);
     }
 
@@ -97,13 +104,19 @@ class AudioService {
         loop: false,
         autostart: false,
         onload: () => {
+            // FX Chain Nodes
+            const pitchShift = new Tone.PitchShift({ pitch: 0 });
             const eq = new Tone.EQ3(0, 0, 0);
             const panner = new Tone.Panner(0);
             const volume = new Tone.Volume(0);
+            const reverb = new Tone.Reverb({ decay: 2.5, wet: 0 }); // Wet starts at 0
             const channel = new Tone.Channel({ volume: 0, pan: 0 }).toDestination();
 
-            player.chain(eq, panner, volume, channel);
-            this.channels.set(id, { player, eq, panner, volume, node: channel });
+            // Chain Construction: Player -> Pitch -> EQ -> Panner -> Volume -> Reverb -> Channel
+            // Note: In real production we might want Reverb as a Send, but for simplicity/Insert style:
+            player.chain(pitchShift, eq, panner, volume, reverb, channel);
+
+            this.channels.set(id, { player, eq, panner, volume, reverb, pitchShift, node: channel });
             player.sync().start(0);
             resolve();
         },
@@ -113,6 +126,23 @@ class AudioService {
         }
       });
     });
+  }
+
+  // --- Effects Control ---
+
+  setReverb(id: string, amount: number) {
+      const ch = this.channels.get(id);
+      if (ch) {
+          // Amount 0-1. 
+          ch.reverb.wet.value = amount;
+      }
+  }
+
+  setPitch(id: string, semiTones: number) {
+      const ch = this.channels.get(id);
+      if (ch) {
+          ch.pitchShift.pitch = semiTones;
+      }
   }
 
   getWaveformPath(id: string, width: number, height: number): string {
@@ -208,12 +238,9 @@ class AudioService {
     if (this.mic && this.recorder) {
       try {
           await this.mic.open();
-          // Important: Disconnect mic from destination to prevent feedback loop (hearing yourself twice with delay)
-          // But connect to recorder.
           this.mic.disconnect(); 
           this.mic.connect(this.recorder);
           this.recorder.start();
-          console.log("Recording started...");
       } catch (e) {
           console.error("Microphone access denied or error", e);
           throw e;

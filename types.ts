@@ -15,6 +15,12 @@ export interface TrackEQ {
   low: number;
 }
 
+export interface TrackEffects {
+  reverb: number; // 0 to 1 (wet/dry)
+  pitch: number;  // -12 to +12 semitones
+  distortion: number; // 0 to 1
+}
+
 export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'UNKNOWN';
 
 export interface Track {
@@ -26,6 +32,7 @@ export interface Track {
   volume: number;
   pan: number;
   eq: TrackEQ;
+  effects: TrackEffects; // Added effects
   isMuted: boolean;
   isSolo: boolean;
   isArmed: boolean;

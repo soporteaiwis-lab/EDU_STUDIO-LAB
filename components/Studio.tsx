@@ -22,7 +22,9 @@ interface StudioProps {
 const INITIAL_TRACKS: Track[] = [
   { 
     id: '1', name: 'Batería Demo', type: 'AUDIO', instrument: 'DRUMS', color: 'bg-rose-500', 
-    volume: 80, pan: 0, eq: { low: 0, mid: 0, high: 0 }, isMuted: false, isSolo: false, isArmed: false, 
+    volume: 80, pan: 0, eq: { low: 0, mid: 0, high: 0 }, 
+    effects: { reverb: 0, pitch: 0, distortion: 0 },
+    isMuted: false, isSolo: false, isArmed: false, 
     audioUrl: 'https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3' 
   },
 ];
@@ -127,7 +129,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     }
   };
 
-  // --- RECORDING LOGIC FIXED ---
+  // --- RECORDING LOGIC ---
   const handleRecordToggle = async () => {
     
     // STOP RECORDING
@@ -136,7 +138,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       setIsRecording(false);
       handleStop(); 
       
-      // Determine which track to save to
       const targetId = recordingTrackIdRef.current; 
       
       if (audioUrl && targetId) {
@@ -152,7 +153,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     const existingArmed = tracks.find(t => t.isArmed);
 
     if (isExplorer) {
-        // EXPLORER MODE: Always create a new track automatically and arm it
         const newId = Date.now().toString();
         const newTrack: Track = {
             id: newId, 
@@ -160,18 +160,17 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             type: 'AUDIO', 
             instrument: 'VOCAL', 
             color: 'bg-rose-500', 
-            volume: 80, pan: 0, eq: {low:0, mid:0, high:0}, 
+            volume: 80, pan: 0, eq: {low:0, mid:0, high:0},
+            effects: { reverb: 0, pitch: 0, distortion: 0 },
             isMuted: false, isSolo: false, 
-            isArmed: true, // Auto-arm
+            isArmed: true, 
             audioUrl: undefined
         };
         
-        // Add to state
         setTracks(prev => [...prev, newTrack]);
         targetTrackId = newId;
 
     } else {
-        // MAKER/PRO MODE: Must have manually armed a track
         if (!existingArmed) {
             alert("¡Arma una pista (Botón Rojo) para grabar en ella!");
             return;
@@ -179,7 +178,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         targetTrackId = existingArmed.id;
     }
 
-    // Start Engine
     try {
         await audioService.startRecording();
         recordingTrackIdRef.current = targetTrackId;
@@ -190,7 +188,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         }
     } catch (e) {
         alert("Error al iniciar grabación. Verifica permisos de micrófono.");
-        // Rollback new track if explorer creation failed?
         if (isExplorer && targetTrackId) {
             setTracks(prev => prev.filter(t => t.id !== targetTrackId));
         }
@@ -202,6 +199,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       const newTrack: Track = {
           id: newId, name: name, type: type, instrument: type === 'MIDI' ? 'KEYS' : 'UNKNOWN',
           color: 'bg-emerald-500', volume: 80, pan: 0, eq: {low:0, mid:0, high:0},
+          effects: { reverb: 0, pitch: 0, distortion: 0 },
           isMuted: false, isSolo: false, isArmed: false, audioUrl: type === 'AUDIO' ? url : undefined
       };
       if (type === 'AUDIO') await audioService.addTrack(newId, url);
@@ -222,12 +220,13 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       const newT: Track = {
           id: Date.now().toString(), name: name || (type === 'AUDIO' ? 'Audio Nuevo' : 'Inst. Nuevo'),
           type: type, instrument: type === 'AUDIO' ? 'VOCAL' : 'KEYS', color: 'bg-gray-500',
-          volume: 80, pan: 0, eq: {low:0, mid:0, high:0}, isMuted: false, isSolo: false, isArmed: false
+          volume: 80, pan: 0, eq: {low:0, mid:0, high:0},
+          effects: { reverb: 0, pitch: 0, distortion: 0 },
+          isMuted: false, isSolo: false, isArmed: false
       };
       setTracks([...tracks, newT]);
   };
 
-  // --- RENDER GRID MEMOIZED ---
   const gridLines = useMemo(() => {
     const lines = [];
     const pixelsPerSecond = 40;
@@ -251,7 +250,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   return (
     <div className={`flex flex-col h-screen ${bgMain} font-nunito select-none overflow-hidden relative`}>
         
-        {/* 1. TOP HEADER */}
+        {/* 1. HEADER */}
         <div className={`h-10 flex-shrink-0 flex justify-between items-center px-4 z-50 shadow-sm ${isPro ? 'bg-[#1a1a1a] border-b border-black text-gray-400' : 'bg-white border-b border-gray-200'}`}>
             <div className="flex items-center space-x-3">
                 <button onClick={onExit} className="hover:text-white flex items-center"><Home size={16} className="mr-1"/> <span className="text-xs font-bold">Salir</span></button>
@@ -262,7 +261,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             </div>
         </div>
 
-        {/* 2. TRANSPORT TOOLBAR */}
+        {/* 2. TRANSPORT */}
         <div className={`h-12 flex-shrink-0 flex items-center px-4 space-x-6 z-40 border-b ${isPro ? 'bg-[#252526] border-black text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
              <div className="flex items-center space-x-2">
                  <button onClick={handleRewind} className="p-1.5 rounded hover:bg-black/20"><SkipBack size={18} fill="currentColor"/></button>
@@ -274,7 +273,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                      <Circle size={20} fill="currentColor"/>
                  </button>
              </div>
-             {/* ... (Middle controls skipped for brevity, same as before) ... */}
              <div className="w-px h-6 bg-gray-500/30"></div>
              <div className="flex items-center space-x-4 font-mono">
                  <div className="flex flex-col items-center leading-none group cursor-ns-resize">
@@ -288,59 +286,54 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                  </div>
              </div>
              <div className="flex-1"></div>
-             <div className="flex items-center space-x-1 border-l border-gray-500/30 pl-4">
+             
+             {/* Toggle Dock Buttons */}
+             <div className="flex items-center space-x-2 border-l border-gray-500/30 pl-4">
+                 <button onClick={() => setShowMixer(!showMixer)} className={`p-1.5 rounded ${showMixer ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`} title="Mezclador"><PanelBottom size={18}/></button>
                  <button onClick={() => {setShowBrowser(false); setShowLyrics(!showLyrics);}} className={`p-1.5 rounded ${showLyrics ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Cancionero"><BookOpen size={18}/></button>
                  <button onClick={() => {setShowLyrics(false); setShowBrowser(!showBrowser);}} className={`p-1.5 rounded ${showBrowser ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Biblioteca"><Grid size={18}/></button>
                  <button onClick={handleExport} className="ml-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-bold flex items-center"><Download size={12} className="mr-1"/> Export</button>
              </div>
         </div>
 
-        {/* 3. WORKSPACE */}
+        {/* 3. CENTER LAYOUT (HORIZONTAL) */}
         <div className="flex-1 flex overflow-hidden min-h-0">
             
+            {/* LEFT: INSPECTOR */}
             {!isExplorer && showInspector && selectedTrackId && (
                 <Inspector 
                     track={tracks.find(t => t.id === selectedTrackId)} 
                     mode={userMode}
-                    onUpdate={(id, up) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t))}
+                    onUpdate={(id, up) => {
+                        setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t));
+                        // Propagate generic updates immediately, specialized FX are handled in component but this is good safety
+                        if(up.effects) {
+                            if(up.effects.reverb !== undefined) audioService.setReverb(id, up.effects.reverb);
+                            if(up.effects.pitch !== undefined) audioService.setPitch(id, up.effects.pitch);
+                        }
+                    }}
                     onClose={() => setSelectedTrackId(null)}
                 />
             )}
 
-            {/* MAIN TIMELINE AREA */}
-            <div className="flex-1 flex flex-col min-w-0 relative">
+            {/* MIDDLE: TIMELINE + MIXER (VERTICAL STACK) */}
+            <div className="flex-1 flex flex-col min-w-0 relative h-full">
                 
-                {/* 
-                    CORRECTION FOR "TIRITAN" & SYNC:
-                    We move the Ruler INSIDE the scrollable container so it moves naturally with the tracks.
-                    We use sticky positioning to keep the ruler at the top and track headers at the left.
-                */}
+                {/* A: SCROLLABLE TIMELINE */}
                 <div 
                     ref={timelineContainerRef}
                     className="flex-1 overflow-auto relative scroll-smooth bg-opacity-10 cursor-crosshair bg-black/20"
                     onMouseDown={(e) => {
-                         // Only seek if clicking on empty space or ruler, not on a track block
-                         // But for simplicity, we allow seeking on ruler mostly.
                          const target = e.target as HTMLElement;
                          if(target === timelineContainerRef.current) handleSeek(e);
                     }}
                 >
-                     {/* Sticky Ruler */}
-                     <div 
-                        className="sticky top-0 z-30 w-fit" 
-                        onMouseDown={handleSeek}
-                     >
+                     <div className="sticky top-0 z-30 w-fit" onMouseDown={handleSeek}>
                         <TimelineRuler mode={userMode} bpm={bpm} zoom={1} paddingLeft={HEADER_WIDTH} />
                      </div>
 
-                     {/* Content Wrapper */}
                      <div className="relative min-w-max pb-32">
-                         {/* Grid Layer */}
-                         <div className="absolute top-0 left-0 min-w-full h-full pointer-events-none z-0">
-                            {gridLines}
-                         </div>
-
-                         {/* Playhead Layer */}
+                         <div className="absolute top-0 left-0 min-w-full h-full pointer-events-none z-0">{gridLines}</div>
                          <div 
                             ref={playheadRef}
                             className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-40 pointer-events-none will-change-transform"
@@ -349,8 +342,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                             <div className="w-3 h-3 -ml-1.5 bg-red-500 transform rotate-45 -mt-1.5 shadow-sm border border-white/50"></div>
                             <div className="h-full w-full shadow-[0_0_8px_rgba(255,0,0,0.6)]"></div>
                          </div>
-
-                         {/* Tracks List */}
                          <div className="relative z-10 pt-2">
                             {tracks.map(track => (
                                 <TrackBlock 
@@ -366,7 +357,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                                 />
                             ))}
                          </div>
-                        
                          <div className="mt-4 p-4 border-2 border-dashed border-gray-600/30 rounded-xl flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity w-fit" style={{ marginLeft: HEADER_WIDTH }}>
                              <button onClick={() => addTrack('AUDIO')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold mr-4">+ Audio Track</button>
                              <button onClick={() => addTrack('MIDI')} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold">+ Instrument Track</button>
@@ -374,8 +364,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                      </div>
                 </div>
 
+                {/* B: DOCKED MIXER (FIXED HEIGHT) */}
                 {showMixer && !isExplorer && (
-                    <div className="h-48 flex-shrink-0 z-30 shadow-[0_-5px_10px_rgba(0,0,0,0.3)] animate-slide-up relative">
+                    <div className="h-64 flex-shrink-0 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.5)] border-t border-gray-700 animate-slide-up relative">
                         <Mixer 
                             tracks={tracks} mode={userMode}
                             onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}}
@@ -389,6 +380,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 )}
             </div>
 
+            {/* RIGHT: PANELS */}
             {showBrowser && (
                 <Browser 
                     mode={userMode}

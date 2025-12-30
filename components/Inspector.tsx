@@ -2,8 +2,9 @@ import React from 'react';
 import { Track, InstrumentType, UserMode } from '../types';
 import { 
   Guitar, Mic, Drum, Music, Keyboard, Wind, 
-  WholeWord, Palette, Edit3, X, Zap 
+  WholeWord, Palette, Edit3, X, Zap, Bot, Mic2 
 } from 'lucide-react';
+import { audioService } from '../services/audioService';
 
 interface InspectorProps {
   track: Track | undefined;
@@ -29,6 +30,19 @@ export const Inspector: React.FC<InspectorProps> = ({ track, mode, onUpdate, onC
     'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500',
     'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-fuchsia-500'
   ];
+
+  const handleFxChange = (type: 'reverb' | 'pitch', value: number) => {
+      if(!track) return;
+      
+      const newEffects = { ...track.effects, [type]: value };
+      
+      // Update State
+      onUpdate(track.id, { effects: newEffects });
+      
+      // Update Engine
+      if(type === 'reverb') audioService.setReverb(track.id, value);
+      if(type === 'pitch') audioService.setPitch(track.id, value);
+  };
 
   return (
     <div className={`w-72 flex-shrink-0 ${mode === UserMode.PRO ? 'bg-gray-800 border-r border-black' : 'bg-white border-r border-gray-200'} flex flex-col h-full overflow-y-auto animate-slide-right`}>
@@ -83,29 +97,39 @@ export const Inspector: React.FC<InspectorProps> = ({ track, mode, onUpdate, onC
         </div>
       </div>
 
-      {/* Inserts / FX (Mock) */}
+      {/* REAL FX SECTION */}
       <div className="p-4 border-t border-gray-700/50 flex-1">
         <div className="flex justify-between items-center mb-2">
             <label className="text-xs font-bold text-gray-500 uppercase">Insertos / FX</label>
-            <button className="text-blue-400 text-xs font-bold hover:text-white">+ Agregar</button>
         </div>
-        <div className="space-y-1">
-            <div className={`p-2 rounded flex items-center justify-between ${mode === UserMode.PRO ? 'bg-gray-900' : 'bg-gray-100'}`}>
+        <div className="space-y-2">
+            
+            {/* Reverb Toggle */}
+            <button 
+                onClick={() => handleFxChange('reverb', track.effects?.reverb > 0 ? 0 : 0.5)}
+                className={`w-full p-2 rounded flex items-center justify-between transition-colors ${track.effects?.reverb > 0 ? 'bg-purple-600 text-white shadow-lg' : (mode === UserMode.PRO ? 'bg-gray-900 text-gray-500 hover:text-white' : 'bg-gray-100 text-gray-500')}`}
+            >
                 <div className="flex items-center space-x-2">
-                    <Zap size={14} className="text-yellow-500"/>
-                    <span className={`text-xs font-bold ${mode === UserMode.PRO ? 'text-gray-300' : 'text-gray-700'}`}>Compressor</span>
+                    <WholeWord size={14} className={track.effects?.reverb > 0 ? "text-white" : "text-purple-500"}/>
+                    <span className="text-xs font-bold">Reverb (Estadio)</span>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            </div>
-            <div className={`p-2 rounded flex items-center justify-between ${mode === UserMode.PRO ? 'bg-gray-900' : 'bg-gray-100'}`}>
+                <div className={`w-2 h-2 rounded-full ${track.effects?.reverb > 0 ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+            </button>
+
+            {/* Pitch Shift Toggle (Robot Voice) */}
+            <button 
+                onClick={() => handleFxChange('pitch', track.effects?.pitch !== 0 ? 0 : -12)}
+                className={`w-full p-2 rounded flex items-center justify-between transition-colors ${track.effects?.pitch !== 0 ? 'bg-orange-600 text-white shadow-lg' : (mode === UserMode.PRO ? 'bg-gray-900 text-gray-500 hover:text-white' : 'bg-gray-100 text-gray-500')}`}
+            >
                 <div className="flex items-center space-x-2">
-                    <WholeWord size={14} className="text-purple-500"/>
-                    <span className={`text-xs font-bold ${mode === UserMode.PRO ? 'text-gray-300' : 'text-gray-700'}`}>Reverb</span>
+                    <Bot size={14} className={track.effects?.pitch !== 0 ? "text-white" : "text-orange-500"}/>
+                    <span className="text-xs font-bold">Voz Robot (-12st)</span>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            </div>
+                <div className={`w-2 h-2 rounded-full ${track.effects?.pitch !== 0 ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+            </button>
+            
              <div className={`p-2 rounded flex items-center justify-between opacity-50 border border-dashed ${mode === UserMode.PRO ? 'border-gray-700' : 'border-gray-300'}`}>
-                <span className="text-xs text-gray-500">Vacío</span>
+                <span className="text-xs text-gray-500 flex items-center"><Zap size={12} className="mr-1"/> + Agregar Efecto</span>
             </div>
         </div>
       </div>
