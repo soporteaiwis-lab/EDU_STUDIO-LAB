@@ -27,7 +27,8 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
           setWaveformPath(path);
        }
     };
-    const timer = setTimeout(generate, 500);
+    // Debounce resize
+    const timer = setTimeout(generate, 200);
     return () => clearTimeout(timer);
   }, [track.id, track.audioUrl, mode]);
 
@@ -49,26 +50,27 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
 
   const isSelectedClass = track.isSelected && mode !== UserMode.EXPLORER ? 'ring-2 ring-blue-500 z-10' : '';
 
+  // Sticky Header Style (Common)
+  const stickyHeaderStyle = "sticky left-0 z-20 shadow-r-md";
+
   // --- RENDER: BASIC MODE (EXPLORER) ---
-  // In Basic mode, we treat it as a simplified block, but to align with timeline, 
-  // we might want a similar structure if the user wants the playhead to pass over it.
-  // However, Basic mode usually implies "Lego Blocks".
-  // If the user demanded "Linea de tiempo" in Basic, we will render it similar to Maker but bigger/simpler.
   if (mode === UserMode.EXPLORER) {
     return (
-      <div className={`flex w-full mb-4 ${track.color} rounded-2xl shadow-md overflow-hidden h-32 border-4 border-white/30 relative`}>
-          {/* Header Area (Fixed Width 16rem = w-64 for consistency) */}
-          <div className="w-64 bg-black/10 flex flex-col items-center justify-center border-r-4 border-white/20 p-2 flex-shrink-0">
+      <div className={`flex w-full mb-4 ${track.color} rounded-2xl shadow-md overflow-hidden h-32 border-4 border-white/30 relative shrink-0`}>
+          {/* Header Area (Sticky) */}
+          <div className={`w-64 ${stickyHeaderStyle} bg-black/10 backdrop-blur-sm flex flex-col items-center justify-center border-r-4 border-white/20 p-2 flex-shrink-0`}>
              <div className="bg-white/20 p-3 rounded-full mb-1">{getIcon()}</div>
              <h3 className="font-fredoka text-xl font-bold text-white shadow-sm truncate w-full text-center">{track.name}</h3>
              <div className="flex space-x-2 mt-2">
                  <button onClick={() => onToggleMute(track.id)} className={`p-2 rounded-full ${track.isMuted ? 'bg-yellow-400 text-black' : 'bg-white/20 text-white'}`}><Volume2 size={20}/></button>
                  <button onClick={() => onDelete(track.id)} className="p-2 rounded-full bg-white/20 text-white hover:bg-red-500"><Trash2 size={20}/></button>
+                 {/* Visual indicator that this track is recording if armed (since there is no manual arm button in explorer) */}
+                 {track.isArmed && <div className="p-2 rounded-full bg-red-500 text-white animate-pulse"><CircleDot size={20}/></div>}
              </div>
           </div>
 
           {/* Timeline Area */}
-          <div className="flex-1 relative flex items-center bg-black/5" ref={containerRef}>
+          <div className="flex-1 relative flex items-center bg-black/5 min-w-[800px]" ref={containerRef}>
              {track.type === 'MIDI' ? (
                  <div className="absolute inset-0 flex items-center justify-center opacity-40">
                     <div className="flex space-x-1">
@@ -90,10 +92,10 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
     return (
       <div 
         onClick={() => onSelect(track.id)}
-        className={`flex w-full mb-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-28 group hover:shadow-md transition-all cursor-pointer ${isSelectedClass}`}
+        className={`flex w-full mb-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-28 group hover:shadow-md transition-all cursor-pointer ${isSelectedClass} shrink-0`}
       >
-         {/* Fixed Width Header: w-64 */}
-         <div className={`w-64 bg-gray-50 border-r border-gray-100 flex flex-col p-3 justify-between relative flex-shrink-0`}>
+         {/* Fixed Width Header (Sticky) */}
+         <div className={`w-64 ${stickyHeaderStyle} bg-gray-50 border-r border-gray-100 flex flex-col p-3 justify-between relative flex-shrink-0`}>
              <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: track.color.replace('bg-', 'rgb(').replace(')', ')') }}>
                  <div className={`h-full w-full ${track.color}`}></div>
              </div>
@@ -119,7 +121,8 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
                  </div>
              </div>
          </div>
-         <div className="flex-1 bg-gray-50 relative p-2 overflow-hidden flex items-center" ref={containerRef}>
+         {/* Timeline */}
+         <div className="flex-1 bg-gray-50 relative p-2 overflow-hidden flex items-center min-w-[800px]" ref={containerRef}>
             {track.type === 'MIDI' ? (
                 <div className={`relative h-20 w-full rounded-xl flex items-center bg-blue-50 border border-blue-100`}>
                      <span className="w-full text-center text-xs text-blue-400 font-bold opacity-50">PATRÓN MIDI</span>
@@ -139,13 +142,12 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
   }
 
   // --- RENDER: PRO MODE ---
-  // Ensure header is w-64 to match others
   return (
     <div 
         onClick={() => onSelect(track.id)}
-        className={`flex w-full mb-1 bg-gray-800 rounded-sm border border-gray-900 overflow-hidden h-24 group hover:border-gray-600 transition-colors cursor-pointer ${isSelectedClass}`}
+        className={`flex w-full mb-1 bg-gray-800 rounded-sm border border-gray-900 overflow-hidden h-24 group hover:border-gray-600 transition-colors cursor-pointer ${isSelectedClass} shrink-0`}
     >
-      <div className="w-64 bg-gray-900 border-r border-black flex flex-col p-2 justify-between flex-shrink-0 relative text-gray-300">
+      <div className={`w-64 ${stickyHeaderStyle} bg-gray-900 border-r border-black flex flex-col p-2 justify-between flex-shrink-0 relative text-gray-300`}>
         <div className="flex items-center justify-between mb-1">
             <div className="flex items-center space-x-1.5 overflow-hidden">
                 <span className={`w-2 h-2 rounded-full ${track.color}`}></span>
@@ -172,7 +174,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
             </div>
         </div>
       </div>
-      <div className="flex-1 bg-gray-800 relative overflow-hidden flex items-center border-l border-black" ref={containerRef}>
+      <div className="flex-1 bg-gray-800 relative overflow-hidden flex items-center border-l border-black min-w-[800px]" ref={containerRef}>
          <div className="absolute inset-0 pointer-events-none" style={{backgroundImage: 'linear-gradient(to right, #202020 1px, transparent 1px)', backgroundSize: '50px 100%'}}></div>
          <div className={`relative h-full w-full border-y border-gray-700 flex items-center ${track.color.replace('bg-', 'bg-opacity-20 ')}`}>
             {track.type === 'MIDI' ? (

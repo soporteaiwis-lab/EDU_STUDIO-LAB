@@ -25,23 +25,26 @@ class AudioService {
   }
 
   async initialize() {
-    if (this.isInitialized) return;
+    if (this.isInitialized && Tone.context.state === 'running') return;
+    
     await Tone.start();
     
-    // Setup Metronome
-    this.metronomeSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.008,
-      octaves: 2,
-      oscillator: { type: 'sine' }
-    }).toDestination();
-    this.metronomeSynth.volume.value = -5; // Slightly louder
+    if (!this.isInitialized) {
+        // Setup Metronome
+        this.metronomeSynth = new Tone.MembraneSynth({
+          pitchDecay: 0.008,
+          octaves: 2,
+          oscillator: { type: 'sine' }
+        }).toDestination();
+        this.metronomeSynth.volume.value = -5;
 
-    // Recorder Setup
-    this.recorder = new Tone.Recorder();
-    this.mic = new Tone.UserMedia();
-    
-    this.isInitialized = true;
-    console.log("Audio Engine Initialized");
+        // Recorder Setup
+        this.recorder = new Tone.Recorder();
+        this.mic = new Tone.UserMedia();
+        
+        this.isInitialized = true;
+        console.log("Audio Engine Initialized");
+    }
   }
 
   setBpm(bpm: number) {
@@ -51,7 +54,6 @@ class AudioService {
 
   setTime(seconds: number) {
     Tone.Transport.seconds = seconds;
-    // Reset beat counter based on time for metronome sync
     const spb = 60 / this.bpm;
     this.currentBeat = Math.floor(seconds / spb);
   }
@@ -60,22 +62,17 @@ class AudioService {
     if (enabled) {
       if (!this.metronomeLoop) {
         this.metronomeLoop = new Tone.Loop((time) => {
-          // 4/4 Logic: Beat 0 is High, 1,2,3 are Low
           const beat = this.currentBeat % 4;
           if (beat === 0) {
-            // Downbeat (Strong)
             this.metronomeSynth?.triggerAttackRelease("C6", "32n", time, 1.0); 
           } else {
-            // Upbeat (Weak)
             this.metronomeSynth?.triggerAttackRelease("C5", "32n", time, 0.5); 
           }
           this.currentBeat++;
         }, "4n");
       }
-      // Calculate current beat based on current transport time to ensure sync on resume
       const spb = 60 / this.bpm;
       this.currentBeat = Math.floor(Tone.Transport.seconds / spb);
-      
       this.metronomeLoop.start(0);
     } else {
       this.metronomeLoop?.stop();
@@ -100,18 +97,13 @@ class AudioService {
         loop: false,
         autostart: false,
         onload: () => {
-            // Channel Strip Construction
             const eq = new Tone.EQ3(0, 0, 0);
             const panner = new Tone.Panner(0);
             const volume = new Tone.Volume(0);
             const channel = new Tone.Channel({ volume: 0, pan: 0 }).toDestination();
 
-            // Chain: Player -> EQ -> Panner -> Volume -> Channel (Mute/Solo) -> Master
             player.chain(eq, panner, volume, channel);
-
             this.channels.set(id, { player, eq, panner, volume, node: channel });
-            
-            // Sync with Transport
             player.sync().start(0);
             resolve();
         },
@@ -126,13 +118,11 @@ class AudioService {
   getWaveformPath(id: string, width: number, height: number): string {
     const channel = this.channels.get(id);
     if (!channel || !channel.player.loaded) return "";
-    
     try {
         const buffer = channel.player.buffer;
         const data = buffer.getChannelData(0); 
         const step = Math.ceil(data.length / width);
         const amp = height / 2;
-        
         let path = `M 0 ${amp} `;
         for (let i = 0; i < width; i++) {
           let min = 1.0;
@@ -154,6 +144,7 @@ class AudioService {
   // --- Transport ---
 
   play() {
+    if (Tone.context.state !== 'running') Tone.context.resume();
     if (Tone.Transport.state !== 'started') {
       Tone.Transport.start();
     }
@@ -172,8 +163,6 @@ class AudioService {
   getCurrentTime(): number {
     return Tone.Transport.seconds;
   }
-
-  // --- Controls ---
 
   setVolume(id: string, value: number) {
     const ch = this.channels.get(id);
@@ -211,17 +200,31 @@ class AudioService {
 
   async startRecording(): Promise<void> {
     await this.initialize();
+    
+    if (Tone.context.state !== 'running') {
+        await Tone.context.resume();
+    }
+
     if (this.mic && this.recorder) {
-      await this.mic.open();
-      // Ensure clean state
-      this.mic.disconnect();
-      this.mic.connect(this.recorder);
-      this.recorder.start();
+      try {
+          await this.mic.open();
+          // Important: Disconnect mic from destination to prevent feedback loop (hearing yourself twice with delay)
+          // But connect to recorder.
+          this.mic.disconnect(); 
+          this.mic.connect(this.recorder);
+          this.recorder.start();
+          console.log("Recording started...");
+      } catch (e) {
+          console.error("Microphone access denied or error", e);
+          throw e;
+      }
+    } else {
+        throw new Error("Audio Engine not initialized properly");
     }
   }
 
   async stopRecording(): Promise<string | null> {
-    if (this.recorder && this.mic) {
+    if (this.recorder && this.mic && this.recorder.state === 'started') {
       const recording = await this.recorder.stop();
       this.mic.close();
       return URL.createObjectURL(recording);
@@ -229,25 +232,20 @@ class AudioService {
     return null;
   }
 
-  // Export Mixdown: Records the main output for a set duration
   async exportMixdown(duration: number): Promise<Blob> {
     const recorder = new Tone.Recorder();
     Tone.Destination.connect(recorder);
-    
     recorder.start();
-    
-    // Play from start
     Tone.Transport.stop();
     Tone.Transport.seconds = 0;
     Tone.Transport.start();
-
     return new Promise((resolve) => {
         setTimeout(async () => {
             const recording = await recorder.stop();
             Tone.Transport.stop();
-            Tone.Destination.disconnect(recorder); // Cleanup
+            Tone.Destination.disconnect(recorder);
             resolve(recording);
-        }, duration * 1000); // Duration in seconds
+        }, duration * 1000);
     });
   }
 }
