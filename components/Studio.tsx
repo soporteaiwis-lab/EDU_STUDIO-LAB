@@ -7,7 +7,7 @@ import { LyricsPanel } from './LyricsPanel';
 import { TimelineRuler } from './TimelineRuler';
 import { CreativeAssistant } from './CreativeAssistant';
 import { audioService } from '../services/audioService';
-import { Track, UserMode, MetronomeConfig } from '../types';
+import { Track, UserMode, MetronomeConfig, GeneratedChords } from '../types';
 import { 
     Play, Square, Sparkles, Home, Download, 
     SkipBack, Circle, Sliders, Settings2,
@@ -29,8 +29,7 @@ const INITIAL_TRACKS: Track[] = [
   },
 ];
 
-// Constant for Track Header Width
-const HEADER_WIDTH = 256; // 256px
+const HEADER_WIDTH = 256; 
 
 export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   // --- STATE ---
@@ -41,7 +40,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   
-  // To track which track is currently being recorded to (especially for Explorer mode auto-create)
   const recordingTrackIdRef = useRef<string | null>(null);
 
   // Layout Visibility
@@ -131,15 +129,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
 
   // --- RECORDING LOGIC ---
   const handleRecordToggle = async () => {
-    
-    // STOP RECORDING
     if (isRecording) {
       const audioUrl = await audioService.stopRecording();
       setIsRecording(false);
       handleStop(); 
       
       const targetId = recordingTrackIdRef.current; 
-      
       if (audioUrl && targetId) {
          await audioService.addTrack(targetId, audioUrl);
          setTracks(prev => prev.map(t => t.id === targetId ? { ...t, audioUrl: audioUrl, isArmed: false } : t));
@@ -148,7 +143,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       return;
     }
 
-    // START RECORDING
     let targetTrackId: string | null = null;
     const existingArmed = tracks.find(t => t.isArmed);
 
@@ -162,14 +156,10 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             color: 'bg-rose-500', 
             volume: 80, pan: 0, eq: {low:0, mid:0, high:0},
             effects: { reverb: 0, pitch: 0, distortion: 0 },
-            isMuted: false, isSolo: false, 
-            isArmed: true, 
-            audioUrl: undefined
+            isMuted: false, isSolo: false, isArmed: true, audioUrl: undefined
         };
-        
         setTracks(prev => [...prev, newTrack]);
         targetTrackId = newId;
-
     } else {
         if (!existingArmed) {
             alert("¡Arma una pista (Botón Rojo) para grabar en ella!");
@@ -182,15 +172,10 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         await audioService.startRecording();
         recordingTrackIdRef.current = targetTrackId;
         setIsRecording(true);
-        if (!isPlaying) { 
-            audioService.play(); 
-            setIsPlaying(true); 
-        }
+        if (!isPlaying) { audioService.play(); setIsPlaying(true); }
     } catch (e) {
-        alert("Error al iniciar grabación. Verifica permisos de micrófono.");
-        if (isExplorer && targetTrackId) {
-            setTracks(prev => prev.filter(t => t.id !== targetTrackId));
-        }
+        alert("Error al iniciar grabación. Verifica permisos.");
+        if (isExplorer && targetTrackId) setTracks(prev => prev.filter(t => t.id !== targetTrackId));
     }
   };
 
@@ -227,6 +212,29 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       setTracks([...tracks, newT]);
   };
 
+  // --- AI ACCEPTANCE HANDLERS ---
+  const handleAcceptAIChords = (data: GeneratedChords) => {
+      // 1. Create a Chord Track
+      const chordTrack: Track = {
+          id: Date.now().toString(),
+          name: `Acordes (${data.key})`,
+          type: 'CHORD',
+          instrument: 'CHORD',
+          color: 'bg-blue-400',
+          volume: 80, pan: 0, eq: {low:0, mid:0, high:0},
+          effects: { reverb: 0, pitch: 0, distortion: 0 },
+          isMuted: false, isSolo: false, isArmed: false,
+          chordData: data.progression
+      };
+      setTracks(prev => [...prev, chordTrack]);
+
+      // 2. Append Melody Hint to Lyrics Panel
+      if (data.melodyHint) {
+          setLyricsContent(prev => prev + `\n\n[IDEA MELÓDICA - ABC]\n${data.melodyHint}`);
+          setShowLyrics(true);
+      }
+  };
+
   const gridLines = useMemo(() => {
     const lines = [];
     const pixelsPerSecond = 40;
@@ -246,11 +254,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     return lines;
   }, [bpm, isPro]);
 
-  // --- MAIN RENDER ---
   return (
     <div className={`flex flex-col h-screen ${bgMain} font-nunito select-none overflow-hidden relative`}>
-        
-        {/* 1. HEADER */}
+        {/* HEADER */}
         <div className={`h-10 flex-shrink-0 flex justify-between items-center px-4 z-50 shadow-sm ${isPro ? 'bg-[#1a1a1a] border-b border-black text-gray-400' : 'bg-white border-b border-gray-200'}`}>
             <div className="flex items-center space-x-3">
                 <button onClick={onExit} className="hover:text-white flex items-center"><Home size={16} className="mr-1"/> <span className="text-xs font-bold">Salir</span></button>
@@ -261,7 +267,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             </div>
         </div>
 
-        {/* 2. TRANSPORT */}
+        {/* TRANSPORT */}
         <div className={`h-12 flex-shrink-0 flex items-center px-4 space-x-6 z-40 border-b ${isPro ? 'bg-[#252526] border-black text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
              <div className="flex items-center space-x-2">
                  <button onClick={handleRewind} className="p-1.5 rounded hover:bg-black/20"><SkipBack size={18} fill="currentColor"/></button>
@@ -287,7 +293,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
              </div>
              <div className="flex-1"></div>
              
-             {/* Toggle Dock Buttons */}
              <div className="flex items-center space-x-2 border-l border-gray-500/30 pl-4">
                  <button onClick={() => setShowMixer(!showMixer)} className={`p-1.5 rounded ${showMixer ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`} title="Mezclador"><PanelBottom size={18}/></button>
                  <button onClick={() => {setShowBrowser(false); setShowLyrics(!showLyrics);}} className={`p-1.5 rounded ${showLyrics ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Cancionero"><BookOpen size={18}/></button>
@@ -296,17 +301,15 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
              </div>
         </div>
 
-        {/* 3. CENTER LAYOUT (HORIZONTAL) */}
+        {/* WORKSPACE */}
         <div className="flex-1 flex overflow-hidden min-h-0">
-            
-            {/* LEFT: INSPECTOR */}
+            {/* LEFT INSPECTOR */}
             {!isExplorer && showInspector && selectedTrackId && (
                 <Inspector 
                     track={tracks.find(t => t.id === selectedTrackId)} 
                     mode={userMode}
                     onUpdate={(id, up) => {
                         setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t));
-                        // Propagate generic updates immediately, specialized FX are handled in component but this is good safety
                         if(up.effects) {
                             if(up.effects.reverb !== undefined) audioService.setReverb(id, up.effects.reverb);
                             if(up.effects.pitch !== undefined) audioService.setPitch(id, up.effects.pitch);
@@ -316,10 +319,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 />
             )}
 
-            {/* MIDDLE: TIMELINE + MIXER (VERTICAL STACK) */}
+            {/* CENTER TIMELINE */}
             <div className="flex-1 flex flex-col min-w-0 relative h-full">
-                
-                {/* A: SCROLLABLE TIMELINE */}
                 <div 
                     ref={timelineContainerRef}
                     className="flex-1 overflow-auto relative scroll-smooth bg-opacity-10 cursor-crosshair bg-black/20"
@@ -364,7 +365,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                      </div>
                 </div>
 
-                {/* B: DOCKED MIXER (FIXED HEIGHT) */}
+                {/* DOCKED MIXER */}
                 {showMixer && !isExplorer && (
                     <div className="h-64 flex-shrink-0 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.5)] border-t border-gray-700 animate-slide-up relative">
                         <Mixer 
@@ -380,7 +381,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 )}
             </div>
 
-            {/* RIGHT: PANELS */}
+            {/* RIGHT PANELS */}
             {showBrowser && (
                 <Browser 
                     mode={userMode}
@@ -396,10 +397,16 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                     onClose={() => setShowLyrics(false)}
                 />
             )}
-
         </div>
 
-        {showAI && <CreativeAssistant onClose={() => setShowAI(false)} onAcceptLyrics={(text) => {setLyricsContent(text); setShowLyrics(true);}} />}
+        {/* AI MODAL */}
+        {showAI && (
+            <CreativeAssistant 
+                onClose={() => setShowAI(false)} 
+                onAcceptLyrics={(text) => {setLyricsContent(text); setShowLyrics(true);}} 
+                onAcceptChords={handleAcceptAIChords}
+            />
+        )}
     </div>
   );
 };

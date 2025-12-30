@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Studio } from './components/Studio';
 import { Dashboard } from './components/Dashboard';
-import { UserMode, UserRole } from './types';
+import { UserMode, UserRole, APP_INFO } from './types';
 import { GraduationCap, Music, User } from 'lucide-react';
 
 export default function App() {
@@ -21,13 +21,13 @@ export default function App() {
     setCurrentPage('STUDIO');
   };
 
-  // 1. LOGIN / ROLE SELECTION SCREEN
+  // 1. LOGIN SCREEN
   if (currentPage === 'LOGIN') {
     return (
       <div className="min-h-screen bg-lego flex flex-col items-center justify-center p-4">
          <div className="bg-white p-8 rounded-[3rem] shadow-xl max-w-2xl w-full text-center border-b-8 border-gray-200">
             <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 mb-2 font-fredoka">EduStudio</h1>
-            <p className="text-gray-500 text-xl font-nunito mb-12">Plataforma Creativa Escolar</p>
+            <p className="text-gray-500 text-xl font-nunito mb-12">Plataforma Creativa Escolar v{APP_INFO.version}</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <button 
@@ -53,13 +53,16 @@ export default function App() {
                 </button>
             </div>
             
-            <p className="mt-8 text-gray-400 text-sm">v1.0.3 - Hecho para la educación chilena 🇨🇱</p>
+            <div className="mt-12 pt-8 border-t border-gray-100">
+                <p className="text-xs text-gray-400 font-bold mb-1">Creado por {APP_INFO.creator}</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{APP_INFO.company} | Chile {APP_INFO.year}</p>
+            </div>
          </div>
       </div>
     );
   }
 
-  // 2. MAIN APP STRUCTURE
+  // 2. MAIN APP
   return (
     <div className="min-h-screen bg-gray-50">
       
@@ -73,11 +76,10 @@ export default function App() {
                 <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold shadow-md">
                     E
                 </div>
-                <span className="font-fredoka font-bold text-xl text-gray-700">EduStudio</span>
+                <span className="font-fredoka font-bold text-xl text-gray-700">EduStudio <span className="text-xs opacity-50">v{APP_INFO.version}</span></span>
             </div>
 
             <div className="flex items-center space-x-4">
-                {/* Mode Switcher - Visible for everyone in Studio for testing */}
                 {currentPage === 'STUDIO' && (
                     <div className="bg-gray-100 rounded-lg p-1 flex text-xs font-bold">
                         <button onClick={() => setMode(UserMode.EXPLORER)} className={`px-3 py-1 rounded transition-colors ${mode === UserMode.EXPLORER ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}>Básico</button>
@@ -100,7 +102,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Content Switcher */}
       {currentPage === 'DASHBOARD' && (
         <Dashboard role={role} onLaunchStudio={handleLaunchStudio} />
       )}

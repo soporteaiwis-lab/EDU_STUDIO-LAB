@@ -9,6 +9,13 @@ export enum UserRole {
   STUDENT = 'STUDENT'
 }
 
+export const APP_INFO = {
+  version: '1.0',
+  creator: 'Armin Wildo Salazar San Martin',
+  company: 'AWiwis AI & TI Solutions',
+  year: '2025'
+};
+
 export interface TrackEQ {
   high: number;
   mid: number;
@@ -21,23 +28,30 @@ export interface TrackEffects {
   distortion: number; // 0 to 1
 }
 
-export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'UNKNOWN';
+export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'UNKNOWN';
+
+export interface ChordEvent {
+  bar: number; // Bar number (1-based)
+  name: string; // e.g., "Cmaj7"
+  duration: number; // in bars
+}
 
 export interface Track {
   id: string;
   name: string;
-  type: 'AUDIO' | 'MIDI' | 'AI_GENERATED';
+  type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD';
   instrument: InstrumentType;
   color: string;
   volume: number;
   pan: number;
   eq: TrackEQ;
-  effects: TrackEffects; // Added effects
+  effects: TrackEffects; 
   isMuted: boolean;
   isSolo: boolean;
   isArmed: boolean;
   audioUrl?: string;
   isSelected?: boolean;
+  chordData?: ChordEvent[]; // For Chord Tracks
 }
 
 export interface MetronomeConfig {
@@ -66,6 +80,12 @@ export interface Session {
 export interface GeneratedLyrics {
   title: string;
   content: string;
+}
+
+export interface GeneratedChords {
+  key: string;
+  progression: ChordEvent[];
+  melodyHint?: string; // ABC Notation string
 }
 
 export interface SongData {
