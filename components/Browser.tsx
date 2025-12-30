@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
 import { UserMode } from '../types';
-import { Search, Music, Mic2, Youtube, Upload, Sparkles, PlayCircle } from 'lucide-react';
+import { Search, Music, Mic2, Youtube, Upload, Sparkles, PlayCircle, FileAudio } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 interface BrowserProps {
   mode: UserMode;
-  onImport: (url: string, name: string) => void;
+  onImport: (url: string, name: string, type: 'AUDIO' | 'MIDI') => void;
   onClose: () => void;
 }
 
@@ -18,7 +18,8 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onClose }) => 
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      onImport(url, file.name.replace(/\.[^/.]+$/, "")); // Remove extension
+      const isMidi = file.name.endsWith('.mid') || file.name.endsWith('.midi');
+      onImport(url, file.name.replace(/\.[^/.]+$/, ""), isMidi ? 'MIDI' : 'AUDIO');
     }
   };
 
@@ -31,7 +32,6 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onClose }) => 
   ];
 
   const preview = (url: string) => {
-    // Simple preview logic
     const audio = new Audio(url);
     audio.volume = 0.5;
     audio.play();
@@ -59,14 +59,14 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onClose }) => 
               type="file" 
               ref={fileInputRef} 
               className="hidden" 
-              accept="audio/*"
+              accept="audio/*,.mid,.midi"
               onChange={handleFileUpload}
             />
            <button 
               onClick={() => fileInputRef.current?.click()}
               className="w-full py-2 bg-blue-600 text-white rounded text-xs font-bold flex items-center justify-center hover:bg-blue-700 transition-colors"
            >
-              <Upload size={14} className="mr-2"/> Importar Audio
+              <Upload size={14} className="mr-2"/> Importar Archivo
            </button>
        </div>
 
@@ -82,10 +82,11 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onClose }) => 
                     </button>
                     <div className="flex flex-col truncate">
                         <span className="text-xs font-bold truncate">{sample.name}</span>
+                        <span className="text-[9px] text-gray-500">Audio • WAV</span>
                     </div>
                 </div>
                 <button 
-                    onClick={() => onImport(sample.url, sample.name)} 
+                    onClick={() => onImport(sample.url, sample.name, 'AUDIO')} 
                     className="opacity-0 group-hover:opacity-100 text-blue-400 p-1 hover:bg-white/10 rounded"
                     title="Añadir a pista"
                 >

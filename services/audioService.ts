@@ -18,6 +18,7 @@ class AudioService {
   
   public bpm: number = 120;
   private isInitialized: boolean = false;
+  private currentBeat: number = 0;
 
   constructor() {
     // Singleton
@@ -50,18 +51,30 @@ class AudioService {
 
   setTime(seconds: number) {
     Tone.Transport.seconds = seconds;
+    // Reset beat counter approximation based on time
+    const spb = 60 / this.bpm;
+    this.currentBeat = Math.floor(seconds / spb);
   }
 
   toggleMetronome(enabled: boolean) {
     if (enabled) {
       if (!this.metronomeLoop) {
         this.metronomeLoop = new Tone.Loop((time) => {
-          this.metronomeSynth?.triggerAttackRelease("C5", "32n", time);
+          // Simple 4/4 accent logic
+          const beat = this.currentBeat % 4;
+          if (beat === 0) {
+            this.metronomeSynth?.triggerAttackRelease("G5", "32n", time, 1.0); // High Click (Downbeat)
+          } else {
+            this.metronomeSynth?.triggerAttackRelease("C5", "32n", time, 0.6); // Low Click
+          }
+          this.currentBeat++;
         }, "4n");
       }
+      this.currentBeat = 0; // Reset on start
       this.metronomeLoop.start(0);
     } else {
       this.metronomeLoop?.stop();
+      this.currentBeat = 0;
     }
   }
 
@@ -149,6 +162,7 @@ class AudioService {
   stop() {
     Tone.Transport.stop();
     Tone.Transport.seconds = 0;
+    this.currentBeat = 0;
   }
 
   getCurrentTime(): number {
@@ -211,28 +225,25 @@ class AudioService {
     return null;
   }
 
-  async exportMixdown(): Promise<string> {
-    const streamDest = Tone.getContext().createMediaStreamDestination();
-    this.channels.forEach(ch => ch.node.connect(streamDest));
+  // Export Mixdown: Records the main output for a set duration
+  async exportMixdown(duration: number): Promise<Blob> {
+    const recorder = new Tone.Recorder();
+    Tone.Destination.connect(recorder);
     
-    const mediaRecorder = new MediaRecorder(streamDest.stream);
-    const chunks: Blob[] = [];
+    recorder.start();
+    
+    // Play from start
+    Tone.Transport.stop();
+    Tone.Transport.seconds = 0;
+    Tone.Transport.start();
 
     return new Promise((resolve) => {
-        mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'audio/wav' });
-            resolve(URL.createObjectURL(blob));
-        };
-        
-        // Quick render simulation
-        mediaRecorder.start();
-        Tone.Transport.seconds = 0;
-        this.play();
-        setTimeout(() => {
-            this.stop();
-            mediaRecorder.stop();
-        }, 5000); 
+        setTimeout(async () => {
+            const recording = await recorder.stop();
+            Tone.Transport.stop();
+            Tone.Destination.disconnect(recorder); // Cleanup
+            resolve(recording);
+        }, duration * 1000); // Duration in seconds
     });
   }
 }

@@ -27,6 +27,9 @@ const INITIAL_TRACKS: Track[] = [
   },
 ];
 
+// Constant for Track Header Width to align timeline/playhead
+const HEADER_WIDTH = 256; // 16rem = w-64
+
 export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   // State
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
@@ -34,6 +37,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Layout State
   const [showMixer, setShowMixer] = useState(false);
@@ -66,8 +70,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     const animate = () => {
       if (playheadRef.current) {
         const time = audioService.getCurrentTime();
-        const pixelsPerSecond = 40; // Must match TimelineRuler
-        playheadRef.current.style.transform = `translateX(${time * pixelsPerSecond}px)`;
+        const pixelsPerSecond = 40; 
+        // Important: Offset by HEADER_WIDTH so playhead starts at grid
+        playheadRef.current.style.transform = `translateX(${HEADER_WIDTH + (time * pixelsPerSecond)}px)`;
       }
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -96,21 +101,29 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       audioService.stop();
       setIsPlaying(false);
       setIsRecording(false);
-      if (playheadRef.current) playheadRef.current.style.transform = `translateX(0px)`;
+      // Reset to HEADER_WIDTH
+      if (playheadRef.current) playheadRef.current.style.transform = `translateX(${HEADER_WIDTH}px)`;
   };
 
   const handleRewind = () => {
       audioService.setTime(0);
-      if (playheadRef.current) playheadRef.current.style.transform = `translateX(0px)`;
+      if (playheadRef.current) playheadRef.current.style.transform = `translateX(${HEADER_WIDTH}px)`;
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isExplorer) return;
     const rect = timelineContainerRef.current?.getBoundingClientRect();
     if (rect) {
-        const x = e.clientX - rect.left;
+        // Calculate X relative to the timeline content area
+        let x = e.clientX - rect.left;
+        
+        // Subtract Header Width to get actual timeline position
+        // If click is on header, do nothing (or set to 0)
+        if (x < HEADER_WIDTH) x = HEADER_WIDTH;
+        
         const pixelsPerSecond = 40;
-        const newTime = Math.max(0, x / pixelsPerSecond);
+        const timelineX = x - HEADER_WIDTH;
+        const newTime = Math.max(0, timelineX / pixelsPerSecond);
+        
         audioService.setTime(newTime);
         if (playheadRef.current) playheadRef.current.style.transform = `translateX(${x}px)`;
     }
@@ -119,7 +132,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const handleRecordToggle = async () => {
     const armedTrack = tracks.find(t => t.isArmed);
     
-    // Auto-create track in Explorer mode if needed
     if (isExplorer && !armedTrack) {
         addTrack('AUDIO', 'Mi Voz');
         setTimeout(() => handleRecordToggle(), 100);
@@ -135,11 +147,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       const audioUrl = await audioService.stopRecording();
       setIsRecording(false);
       handleStop(); 
-      
-      if (audioUrl) {
-         const targetId = armedTrack ? armedTrack.id : tracks[tracks.length-1].id;
-         await audioService.addTrack(targetId, audioUrl);
-         setTracks(prev => prev.map(t => t.id === targetId ? { ...t, audioUrl: audioUrl } : t));
+      if (audioUrl && armedTrack) {
+         await audioService.addTrack(armedTrack.id, audioUrl);
+         setTracks(prev => prev.map(t => t.id === armedTrack.id ? { ...t, audioUrl: audioUrl } : t));
       }
     } else {
         await audioService.startRecording();
@@ -148,20 +158,40 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     }
   };
 
-  const handleImport = async (url: string, name: string) => {
+  const handleImport = async (url: string, name: string, type: 'AUDIO'|'MIDI') => {
       const newId = Date.now().toString();
       const newTrack: Track = {
           id: newId,
           name: name,
-          type: 'AUDIO',
-          instrument: 'UNKNOWN',
+          type: type,
+          instrument: type === 'MIDI' ? 'KEYS' : 'UNKNOWN',
           color: 'bg-emerald-500',
           volume: 80, pan: 0, eq: {low:0, mid:0, high:0},
           isMuted: false, isSolo: false, isArmed: false,
-          audioUrl: url
+          audioUrl: type === 'AUDIO' ? url : undefined
       };
-      await audioService.addTrack(newId, url);
+      // For now, MIDI is just a visual block, audio is loaded
+      if (type === 'AUDIO') {
+          await audioService.addTrack(newId, url);
+      }
       setTracks([...tracks, newTrack]);
+  };
+
+  const handleExport = async () => {
+      setIsExporting(true);
+      try {
+          // Export 10 seconds for demo (in production calculate song length)
+          const blob = await audioService.exportMixdown(10);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Mixdown_EduStudio_${Date.now()}.wav`; // Default to wav as per mediarecorder
+          a.click();
+      } catch (e) {
+          console.error(e);
+          alert("Error exportando");
+      }
+      setIsExporting(false);
   };
 
   // Track Logic Handlers
@@ -196,17 +226,17 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   // --- RENDER ---
   const bgMain = isPro ? 'bg-gray-900 text-gray-200' : isExplorer ? 'bg-lego text-gray-800' : 'bg-gray-50 text-gray-700';
   
-  // Render Grid Lines logic
   const renderGrid = () => {
-    if (isExplorer) return null;
+    // Only render grid starting AFTER header
     const lines = [];
     const pixelsPerSecond = 40;
     const secondsPerBar = (60 / bpm) * 4;
     const gap = pixelsPerSecond * secondsPerBar;
     
+    // Grid starts at HEADER_WIDTH
     for(let i=0; i<50; i++) {
         lines.push(
-            <div key={i} className="absolute top-0 bottom-0 w-px border-l border-gray-400/20 pointer-events-none" style={{left: `${i * gap}px`}}></div>
+            <div key={i} className="absolute top-0 bottom-0 w-px border-l border-gray-400/20 pointer-events-none" style={{left: `${HEADER_WIDTH + (i * gap)}px`}}></div>
         );
     }
     return <div className="absolute inset-0 z-0">{lines}</div>;
@@ -222,31 +252,31 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 <div className="h-6 w-px bg-gray-400/30 mx-1"></div>
                 {!isExplorer && (
                     <div className="flex items-center space-x-2">
-                        <button onClick={() => {}} className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 text-white rounded font-bold text-xs hover:bg-blue-700"><Save size={14}/> <span className="hidden sm:inline">Guardar</span></button>
+                        <button onClick={handleExport} disabled={isExporting} className={`flex items-center space-x-1 px-3 py-1.5 ${isExporting ? 'bg-gray-500' : 'bg-purple-600 hover:bg-purple-700'} text-white rounded font-bold text-xs`}>
+                            <Download size={14}/> <span className="hidden sm:inline">{isExporting ? 'Mixdown...' : 'Exportar WAV'}</span>
+                        </button>
                     </div>
                 )}
             </div>
 
             {/* Metronome Center */}
-            {!isExplorer && (
-                <div className={`flex items-center space-x-4 px-4 py-1 rounded-full ${isPro ? 'bg-black/40 border border-gray-700' : 'bg-gray-100 border border-gray-200'}`}>
-                    <div className="flex flex-col items-center cursor-pointer hover:text-blue-500 relative w-12 group">
-                        <span className="text-lg font-mono font-bold leading-none">{bpm}</span>
-                        <span className="text-[8px] font-bold text-gray-500">BPM</span>
-                        <input type="range" min="60" max="200" value={bpm} onChange={(e) => setBpm(parseInt(e.target.value))} className="absolute inset-0 opacity-0 cursor-ns-resize"/>
-                    </div>
-                    <button 
-                        onClick={() => {
-                            const newState = !metronome.enabled;
-                            setMetronome(m => ({...m, enabled: newState}));
-                            audioService.toggleMetronome(newState);
-                        }}
-                        className={`p-1.5 rounded-full transition-colors ${metronome.enabled ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        <Clock size={16} />
-                    </button>
+            <div className={`flex items-center space-x-4 px-4 py-1 rounded-full ${isPro ? 'bg-black/40 border border-gray-700' : 'bg-gray-100 border border-gray-200'}`}>
+                <div className="flex flex-col items-center cursor-pointer hover:text-blue-500 relative w-12 group">
+                    <span className="text-lg font-mono font-bold leading-none">{bpm}</span>
+                    <span className="text-[8px] font-bold text-gray-500">BPM</span>
+                    <input type="range" min="60" max="200" value={bpm} onChange={(e) => setBpm(parseInt(e.target.value))} className="absolute inset-0 opacity-0 cursor-ns-resize"/>
                 </div>
-            )}
+                <button 
+                    onClick={() => {
+                        const newState = !metronome.enabled;
+                        setMetronome(m => ({...m, enabled: newState}));
+                        audioService.toggleMetronome(newState);
+                    }}
+                    className={`p-1.5 rounded-full transition-colors ${metronome.enabled ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Clock size={16} />
+                </button>
+            </div>
 
             <div className="flex items-center space-x-2">
                 <button onClick={() => setShowBrowser(!showBrowser)} className={`p-2 rounded-lg transition-colors ${showBrowser ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`} title="Abrir Librería">
@@ -259,7 +289,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         {/* 2. MAIN WORKSPACE */}
         <div className="flex-1 flex overflow-hidden relative">
             
-            {/* Inspector (Visible for Pro AND Maker if selected) */}
+            {/* Inspector */}
             {!isExplorer && showInspector && selectedTrackId && (
                 <Inspector 
                     track={tracks.find(t => t.id === selectedTrackId)} 
@@ -274,7 +304,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 
                 {/* Timeline Header - Clickable for seeking */}
                 <div onMouseDown={handleSeek} className="cursor-pointer">
-                    <TimelineRuler mode={userMode} bpm={bpm} zoom={1} />
+                    <TimelineRuler mode={userMode} bpm={bpm} zoom={1} paddingLeft={HEADER_WIDTH} />
                 </div>
 
                 {/* Scrollable Tracks Area */}
@@ -282,22 +312,21 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                     ref={timelineContainerRef}
                     className="flex-1 overflow-y-auto overflow-x-hidden p-2 relative pb-32 scroll-smooth cursor-crosshair"
                     onMouseDown={(e) => {
-                         // Only seek if clicking on background, not on a track block
+                         // Only seek if clicking on background
                          if(e.target === timelineContainerRef.current || e.target === e.currentTarget) handleSeek(e);
                     }}
                 >
                      {renderGrid()}
 
-                     {/* PLAYHEAD CURSOR */}
-                     {!isExplorer && (
-                        <div 
-                            ref={playheadRef}
-                            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none will-change-transform shadow-[0_0_10px_rgba(255,0,0,0.5)]"
-                            style={{ left: '0px' }} 
-                        >
-                            <div className="w-4 h-4 -ml-2 bg-red-500 transform rotate-45 -mt-2 shadow-sm border border-white"></div>
-                        </div>
-                     )}
+                     {/* PLAYHEAD CURSOR - Shifted by HEADER_WIDTH */}
+                     <div 
+                        ref={playheadRef}
+                        className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none will-change-transform shadow-[0_0_10px_rgba(255,0,0,0.5)]"
+                        style={{ left: `${HEADER_WIDTH}px` }} 
+                     >
+                        <div className="w-4 h-4 -ml-2 bg-red-500 transform rotate-45 -mt-2 shadow-sm border border-white"></div>
+                        <div className="w-16 -ml-8 mt-2 bg-red-500 text-white text-[9px] font-bold text-center rounded px-1">PLAY</div>
+                     </div>
 
                      <div className="space-y-1 z-10 relative">
                         {tracks.map(track => (
@@ -314,8 +343,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                             />
                         ))}
                         
-                        {/* Add Track Area */}
-                        <div className="mt-6 border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center opacity-60 hover:opacity-100 transition-opacity z-20 relative">
+                        {/* Add Track Area - Aligned to HEADER_WIDTH somewhat visually */}
+                        <div className="mt-6 border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center opacity-60 hover:opacity-100 transition-opacity z-20 relative" style={{ marginLeft: isExplorer ? 0 : 0 }}>
                             <span className="text-sm font-bold text-gray-400 mb-2">Agregar Nueva Pista</span>
                             <div className="flex space-x-4">
                                 <button onClick={() => addTrack('AUDIO')} className="bg-gray-200 hover:bg-blue-100 text-gray-600 hover:text-blue-600 px-4 py-2 rounded-lg text-xs font-bold transition-colors">🎤 Audio / Voz</button>
@@ -343,7 +372,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             </div>
 
             {/* Browser (Right Dock) */}
-            {showBrowser && !isExplorer && (
+            {showBrowser && (
                 <Browser 
                     mode={userMode}
                     onImport={handleImport}
@@ -352,7 +381,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             )}
         </div>
 
-        {/* 3. FLOATING TRANSPORT "ISLAND" */}
+        {/* 3. FLOATING TRANSPORT */}
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-auto max-w-full px-4">
              <div className={`flex items-center space-x-4 px-6 py-3 rounded-full shadow-2xl backdrop-blur-md border ${isPro ? 'bg-gray-800/95 border-gray-600 text-gray-200' : 'bg-white/95 border-white text-gray-700'} transition-all hover:scale-[1.02]`}>
                  
