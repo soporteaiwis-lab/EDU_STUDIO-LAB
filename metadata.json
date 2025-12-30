@@ -1,0 +1,7 @@
+{
+  "name": "EduStudio Modular",
+  "description": "Un DAW educativo tipo LEGO con complejidad progresiva e IA integrada para escuelas.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
