@@ -10,7 +10,7 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '1.3',
+  version: '2.0',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
@@ -28,7 +28,7 @@ export interface TrackEffects {
   distortion: number;
 }
 
-export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'MELODY' | 'UNKNOWN';
+export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'MELODY' | 'SAMPLER' | 'UNKNOWN';
 
 export interface ChordEvent {
   bar: number;
@@ -50,7 +50,7 @@ export interface MelodyEvent {
 export interface Track {
   id: string;
   name: string;
-  type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD' | 'RHYTHM' | 'MELODY' | 'DRUMS';
+  type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD' | 'RHYTHM' | 'MELODY' | 'DRUMS' | 'SAMPLER';
   instrument: InstrumentType;
   color: string;
   volume: number;
@@ -60,31 +60,39 @@ export interface Track {
   isMuted: boolean;
   isSolo: boolean;
   isArmed: boolean;
-  audioUrl?: string;
+  audioUrl?: string; // For AUDIO tracks (long)
+  samplerUrl?: string; // For SAMPLER tracks (short SFX)
   isSelected?: boolean;
   chordData?: ChordEvent[]; 
   rhythmData?: DrumEvent[];
   melodyData?: MelodyEvent[];
 }
 
-// NEW: Stores the creative "DNA" of the song for the Songbook
 export interface SongMetadata {
   lyrics: string;
+  script?: string; // New: For podcast/play scripts
+  sfxSuggestions?: SFXSuggestion[]; // New: AI Suggestions
   chords?: GeneratedChords;
   melody?: GeneratedMelody;
   rhythm?: GeneratedRhythm;
   key: string;
   bpm: number;
+  timeSignature: [number, number]; // New: [4, 4]
   title: string;
   author: string;
+}
+
+export interface SFXSuggestion {
+  id: string;
+  textContext: string; // The phrase triggering the SFX
+  soundDescription: string; // "Door slamming shut"
+  timeOffset?: number; // Approximate time if analyzable
 }
 
 export interface MetronomeConfig {
   enabled: boolean;
   bpm: number;
   timeSignature: [number, number];
-  countIn: boolean;
-  clickSound: 'BEEP' | 'WOODBLOCK' | 'COWBELL';
   volume: number;
 }
 
@@ -94,7 +102,7 @@ export interface Session {
   lastModified: number;
   bpm: number;
   tracks: Track[];
-  metadata?: SongMetadata; // Added metadata persistence
+  metadata?: SongMetadata;
 }
 
 export interface GeneratedLyrics {
@@ -121,12 +129,8 @@ export interface GeneratedRhythm {
   events: DrumEvent[];
 }
 
-export enum EffectType {
-  NONE = 'NONE',
-  REVERB_BATHROOM = 'REVERB_BATHROOM',
-  REVERB_STADIUM = 'REVERB_STADIUM',
-  ROBOT = 'ROBOT',
-  CHIPMUNK = 'CHIPMUNK'
+export interface GeneratedSFXList {
+  suggestions: SFXSuggestion[];
 }
 
 export interface Assignment {

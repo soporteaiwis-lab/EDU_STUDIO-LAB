@@ -2,7 +2,8 @@ import * as Tone from 'tone';
 import { ChordEvent, DrumEvent, MelodyEvent } from '../types';
 
 interface ChannelStrip {
-  player?: Tone.Player; // Audio
+  player?: Tone.Player; // Audio (Long)
+  sampler?: Tone.Player; // Sampler (One-Shot)
   synth?: Tone.PolySynth; // Chords/Melody
   drumSampler?: Tone.Players; // Drums
   panner: Tone.Panner;
@@ -11,7 +12,7 @@ interface ChannelStrip {
   reverb: Tone.Reverb;
   pitchShift: Tone.PitchShift;
   node: Tone.Channel;
-  type: 'AUDIO' | 'INSTRUMENT' | 'DRUMS';
+  type: 'AUDIO' | 'INSTRUMENT' | 'DRUMS' | 'SAMPLER';
 }
 
 class AudioService {
@@ -20,15 +21,15 @@ class AudioService {
   private recorder: Tone.Recorder | null = null;
   private metronomeLoop: Tone.Loop | null = null;
   private metronomeSynth: Tone.MembraneSynth | null = null;
+  private metronomeClick: Tone.MetalSynth | null = null; // For high click
   
-  // Parts for sequencing
   private activeParts: Map<string, Tone.Part> = new Map();
   
   public bpm: number = 120;
+  public timeSignature: [number, number] = [4, 4];
   private isInitialized: boolean = false;
   private currentBeat: number = 0;
 
-  // Chord Dictionary
   private chordMap: Record<string, string[]> = {
       'C': ['C4', 'E4', 'G4'], 'Cm': ['C4', 'Eb4', 'G4'], 'C7': ['C4', 'E4', 'G4', 'Bb4'],
       'D': ['D4', 'F#4', 'A4'], 'Dm': ['D4', 'F4', 'A4'], 'D7': ['D4', 'F#4', 'A4', 'C5'],
@@ -39,17 +40,20 @@ class AudioService {
       'B': ['B3', 'D#4', 'F#4'], 'Bm': ['B3', 'D4', 'F#4']
   };
 
-  constructor() {
-    // Singleton
-  }
+  constructor() { }
 
   async initialize() {
     if (this.isInitialized && Tone.context.state === 'running') return;
     await Tone.start();
     
     if (!this.isInitialized) {
+        // Dual Synth for Metronome (Downbeat/Upbeat)
         this.metronomeSynth = new Tone.MembraneSynth({ pitchDecay: 0.008, octaves: 2, oscillator: { type: 'sine' } }).toDestination();
+        this.metronomeClick = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination();
+        
         this.metronomeSynth.volume.value = -10;
+        if(this.metronomeClick) this.metronomeClick.volume.value = -15;
+
         this.recorder = new Tone.Recorder();
         this.mic = new Tone.UserMedia();
         this.isInitialized = true;
@@ -61,36 +65,51 @@ class AudioService {
     Tone.Transport.bpm.value = bpm;
   }
 
+  setTimeSignature(numerator: number, denominator: number) {
+    this.timeSignature = [numerator, denominator];
+    Tone.Transport.timeSignature = numerator;
+  }
+
   setTime(seconds: number) {
     Tone.Transport.seconds = seconds;
+    // Calculate beat for visual sync if needed
     const spb = 60 / this.bpm;
     this.currentBeat = Math.floor(seconds / spb);
   }
 
+  toggleMetronome(enabled: boolean) {
+      if (enabled) {
+          if (this.metronomeLoop) { this.metronomeLoop.stop(); this.metronomeLoop.dispose(); }
+          
+          this.metronomeLoop = new Tone.Loop((time) => {
+              // Calculate current beat position in the bar (0 to numerator-1)
+              const position = Tone.Transport.position.toString().split(':');
+              const quarter = parseInt(position[1]); // 0, 1, 2, 3...
+              
+              if (quarter === 0) {
+                  // Downbeat (High pitch)
+                  this.metronomeClick?.triggerAttackRelease("C6", "32n", time);
+              } else {
+                  // Upbeat (Low pitch)
+                  this.metronomeSynth?.triggerAttackRelease("C5", "32n", time);
+              }
+          }, "4n"); // Quarter note pulse
+          
+          this.metronomeLoop.start(0);
+      } else {
+          this.metronomeLoop?.stop();
+      }
+  }
+
   // --- Track Management ---
 
-  async addTrack(id: string, urlOrType: string, type: 'AUDIO' | 'INSTRUMENT' | 'DRUMS' = 'AUDIO'): Promise<void> {
+  async addTrack(id: string, urlOrType: string, type: 'AUDIO' | 'INSTRUMENT' | 'DRUMS' | 'SAMPLER' = 'AUDIO'): Promise<void> {
     await this.initialize();
     
-    // Cleanup existing
     if (this.channels.has(id)) {
-        const c = this.channels.get(id);
-        c?.player?.dispose();
-        c?.synth?.dispose();
-        c?.drumSampler?.dispose();
-        c?.reverb.dispose();
-        c?.pitchShift.dispose();
-        c?.eq.dispose();
-        c?.panner.dispose();
-        c?.node.dispose();
-        this.channels.delete(id);
+        this.disposeTrack(id);
     }
-    // Cleanup parts
-    if(this.activeParts.has(id)) {
-        this.activeParts.get(id)?.dispose();
-        this.activeParts.delete(id);
-    }
-
+    
     // Common Chain
     const eq = new Tone.EQ3(0, 0, 0);
     const panner = new Tone.Panner(0);
@@ -99,39 +118,55 @@ class AudioService {
     const pitchShift = new Tone.PitchShift({ pitch: 0 });
     const channel = new Tone.Channel({ volume: 0, pan: 0 }).toDestination();
 
+    // Chain builder helper
+    const buildChain = (node: Tone.AudioNode) => {
+        node.chain(pitchShift, eq, panner, volume, reverb, channel);
+    };
+
     if (type === 'INSTRUMENT') {
-        // CHORDS / MELODY SYNTH
-        // FIX: Short release/sustain to prevent "muddy" overlapping chords
         const synth = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: "triangle" },
             envelope: { attack: 0.02, decay: 0.1, sustain: 0.1, release: 0.3 } 
         });
-        synth.chain(pitchShift, eq, panner, volume, reverb, channel);
+        buildChain(synth);
         this.channels.set(id, { synth, eq, panner, volume, reverb, pitchShift, node: channel, type: 'INSTRUMENT' });
 
     } else if (type === 'DRUMS') {
-        // DRUM SAMPLER
         return new Promise((resolve) => {
             const players = new Tone.Players({
                 KICK: "https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3",
                 SNARE: "https://tonejs.github.io/audio/drum-samples/CR78/snare.mp3",
                 HIHAT: "https://tonejs.github.io/audio/drum-samples/CR78/hihat.mp3"
             }, () => {
-                players.chain(pitchShift, eq, panner, volume, reverb, channel);
+                buildChain(players);
                 this.channels.set(id, { drumSampler: players, eq, panner, volume, reverb, pitchShift, node: channel, type: 'DRUMS' });
                 resolve();
             });
         });
 
+    } else if (type === 'SAMPLER') {
+        // ONE-SHOT SFX
+        return new Promise((resolve, reject) => {
+             // For sampler, we want re-trigger ability, no loop
+            const player = new Tone.Player({
+                url: urlOrType, loop: false, autostart: false,
+                onload: () => {
+                    buildChain(player);
+                    this.channels.set(id, { sampler: player, eq, panner, volume, reverb, pitchShift, node: channel, type: 'SAMPLER' });
+                    resolve();
+                },
+                onerror: (e) => reject(e)
+            });
+        });
     } else {
-        // AUDIO TRACK
+        // AUDIO TRACK (Long form)
         return new Promise((resolve, reject) => {
             const player = new Tone.Player({
                 url: urlOrType, loop: false, autostart: false,
                 onload: () => {
-                    player.chain(pitchShift, eq, panner, volume, reverb, channel);
+                    buildChain(player);
                     this.channels.set(id, { player, eq, panner, volume, reverb, pitchShift, node: channel, type: 'AUDIO' });
-                    player.sync().start(0);
+                    player.sync().start(0); // Syncs to transport timeline
                     resolve();
                 },
                 onerror: (e) => reject(e)
@@ -140,8 +175,32 @@ class AudioService {
     }
   }
 
-  // --- SCHEDULING (SEQUENCER) ---
+  triggerSampler(id: string) {
+      const ch = this.channels.get(id);
+      if (ch && ch.sampler && ch.sampler.loaded) {
+          ch.sampler.start();
+      }
+  }
 
+  private disposeTrack(id: string) {
+      const c = this.channels.get(id);
+      c?.player?.dispose();
+      c?.sampler?.dispose();
+      c?.synth?.dispose();
+      c?.drumSampler?.dispose();
+      c?.reverb.dispose();
+      c?.pitchShift.dispose();
+      c?.eq.dispose();
+      c?.panner.dispose();
+      c?.node.dispose();
+      this.channels.delete(id);
+      if(this.activeParts.has(id)) {
+        this.activeParts.get(id)?.dispose();
+        this.activeParts.delete(id);
+    }
+  }
+
+  // --- SCHEDULING (SEQUENCER) ---
   scheduleChords(trackId: string, chords: ChordEvent[]) {
      const ch = this.channels.get(trackId);
      if (!ch || !ch.synth) return;
@@ -155,9 +214,8 @@ class AudioService {
 
      const part = new Tone.Part((time, value) => {
          const notes = this.chordMap[value.chordName] || this.chordMap[value.chordName.replace('maj', '')] || ['C4'];
-         ch.synth?.triggerAttackRelease(notes, "1n", time); // Force 1 bar length but envelope handles release
+         ch.synth?.triggerAttackRelease(notes, "1n", time);
      }, events).start(0);
-     
      this.activeParts.set(trackId, part);
   }
 
@@ -165,10 +223,6 @@ class AudioService {
       const ch = this.channels.get(trackId);
       if (!ch || !ch.drumSampler) return;
       if (this.activeParts.has(trackId)) this.activeParts.get(trackId)?.dispose();
-
-      // Loop the 2 bar pattern for the whole song duration (e.g. 30 bars)
-      // For simplicity, we just schedule the pattern once at start, but let's loop it.
-      const loopLength = "2m"; // Assuming 2 bar patterns from AI
       
       const part = new Tone.Part((time, value) => {
           if (ch.drumSampler?.has(value.instrument)) {
@@ -177,9 +231,8 @@ class AudioService {
       }, events);
       
       part.loop = true;
-      part.loopEnd = loopLength;
+      part.loopEnd = "2m";
       part.start(0);
-      
       this.activeParts.set(trackId, part);
   }
 
@@ -191,29 +244,18 @@ class AudioService {
       const part = new Tone.Part((time, value) => {
           ch.synth?.triggerAttackRelease(value.note, value.duration, time);
       }, events).start(0);
-      
       this.activeParts.set(trackId, part);
   }
 
-  // --- PREVIEWS ---
-
+  // --- HELPERS ---
   previewChord(chordName: string) {
       if(!this.isInitialized) this.initialize();
       const synth = new Tone.PolySynth().toDestination();
       synth.volume.value = -10;
-      synth.set({ envelope: { release: 0.2 } }); // Short release
+      synth.set({ envelope: { release: 0.2 } }); 
       const notes = this.chordMap[chordName] || ['C4', 'E4', 'G4'];
       synth.triggerAttackRelease(notes, "4n");
   }
-
-  previewMelodyNote(note: string) {
-      if(!this.isInitialized) this.initialize();
-      const synth = new Tone.Synth().toDestination();
-      synth.volume.value = -10;
-      synth.triggerAttackRelease(note, "8n");
-  }
-
-  // --- HELPERS ---
 
   setVolume(id: string, value: number) {
     const ch = this.channels.get(id);
@@ -222,9 +264,11 @@ class AudioService {
 
   getWaveformPath(id: string, width: number, height: number): string {
     const channel = this.channels.get(id);
-    if (!channel || !channel.player || !channel.player.loaded) return "";
+    // Support waveform for both Audio and Sampler
+    const player = channel?.player || channel?.sampler;
+    if (!channel || !player || !player.loaded) return "";
     try {
-        const buffer = channel.player.buffer;
+        const buffer = player.buffer;
         const data = buffer.getChannelData(0); 
         const step = Math.ceil(data.length / width);
         const amp = height / 2;
@@ -257,13 +301,39 @@ class AudioService {
   toggleMute(id: string, m: boolean) { const c=this.channels.get(id); if(c) c.node.mute=m; }
   toggleSolo(id: string, s: boolean) { const c=this.channels.get(id); if(c) c.node.solo=s; }
 
-  // Recording
-  async startRecording() { await this.initialize(); if(this.mic && this.recorder) { await this.mic.open(); this.mic.connect(this.recorder); this.recorder.start(); } }
-  async stopRecording() { if(this.recorder && this.mic) { const r=await this.recorder.stop(); this.mic.close(); return URL.createObjectURL(r); } return null; }
-  async exportMixdown(dur: number): Promise<Blob> {
-    const r = new Tone.Recorder(); Tone.Destination.connect(r); r.start();
-    Tone.Transport.stop(); Tone.Transport.seconds=0; Tone.Transport.start();
-    return new Promise(res => setTimeout(async()=>{ const b=await r.stop(); Tone.Transport.stop(); Tone.Destination.disconnect(r); res(b); }, dur*1000));
+  // Recording - ROBUST PERMISSION CHECK
+  async checkPermissions(): Promise<boolean> {
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Stop immediately to release
+          stream.getTracks().forEach(track => track.stop());
+          return true;
+      } catch (err) {
+          console.error("Microphone permission denied:", err);
+          return false;
+      }
+  }
+
+  async startRecording() { 
+      await this.initialize(); 
+      if(this.mic && this.recorder) { 
+          try {
+              await this.mic.open(); 
+              this.mic.connect(this.recorder); 
+              this.recorder.start(); 
+          } catch(e) {
+              throw new Error("Cannot open microphone");
+          }
+      } 
+  }
+  
+  async stopRecording() { 
+      if(this.recorder && this.mic && this.recorder.state === 'started') { 
+          const r = await this.recorder.stop(); 
+          this.mic.close(); 
+          return URL.createObjectURL(r); 
+      } 
+      return null; 
   }
 }
 

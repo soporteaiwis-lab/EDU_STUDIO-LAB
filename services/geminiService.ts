@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { GeneratedLyrics, GeneratedChords, GeneratedRhythm, GeneratedMelody } from "../types";
+import { GeneratedLyrics, GeneratedChords, GeneratedRhythm, GeneratedMelody, GeneratedSFXList } from "../types";
 
 const apiKey = process.env.API_KEY || ''; 
 const ai = new GoogleGenAI({ apiKey });
@@ -46,7 +45,7 @@ export const generateProgression = async (key: string, mood: string): Promise<Ge
   } catch (e) { return { key: "C", progression: [] }; }
 }
 
-// --- RHYTHM (DRUMS) ---
+// --- RHYTHM ---
 export const generateRhythm = async (style: string): Promise<GeneratedRhythm> => {
    if (!apiKey || apiKey === 'YOUR_API_KEY') {
        return mockDelay({
@@ -60,11 +59,7 @@ export const generateRhythm = async (style: string): Promise<GeneratedRhythm> =>
        });
    }
    try {
-       const prompt = `Genera un patrón de batería (2 compases) estilo "${style}". 
-       Formato Tone.js (Bar:Quarter:Sixteenth) comenzando en 0:0:0 hasta 1:3:0. 
-       Instrumentos: KICK, SNARE, HIHAT. 
-       JSON: {style, bpm, events:[{time, instrument}]}`;
-       
+       const prompt = `Genera un patrón de batería (2 compases) estilo "${style}". JSON: {style, bpm, events:[{time, instrument}]}`;
        const response = await ai.models.generateContent({
            model: 'gemini-3-flash-preview',
            contents: prompt,
@@ -80,23 +75,11 @@ export const generateMelody = async (key: string, clef: 'TREBLE' | 'BASS'): Prom
         return mockDelay({
             key, clef,
             abc: "C D E F | G A B c | c B A G | F E D C |",
-            events: [
-                {note: "C4", duration: "4n", time: "0:0:0"}, {note: "D4", duration: "4n", time: "0:1:0"},
-                {note: "E4", duration: "4n", time: "0:2:0"}, {note: "F4", duration: "4n", time: "0:3:0"},
-                {note: "G4", duration: "4n", time: "1:0:0"}, {note: "A4", duration: "4n", time: "1:1:0"},
-                {note: "B4", duration: "4n", time: "1:2:0"}, {note: "C5", duration: "4n", time: "1:3:0"}
-            ]
+            events: [{note: "C4", duration: "4n", time: "0:0:0"}, {note: "G4", duration: "4n", time: "1:0:0"}]
         });
     }
     try {
-        const prompt = `Genera una melodía simple de 2 compases en escala de ${key}, Clave ${clef}.
-        Devuelve formato JSON compatible con Tone.js Part:
-        {
-          key, clef, abc: "string (notacion abc)",
-          events: [{note: "C4", duration: "4n", time: "0:0:0"}, ...]
-        }
-        Usa tiempos 0:0:0, 0:1:0, etc. Notas dentro de rango C3-C5.`;
-        
+        const prompt = `Genera melodía 2 compases en ${key}, Clave ${clef}. JSON {key, clef, abc, events:[{note, duration, time}]}.`;
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
@@ -104,4 +87,28 @@ export const generateMelody = async (key: string, clef: 'TREBLE' | 'BASS'): Prom
         });
         return JSON.parse(response.text?.replace(/```json|```/g, '').trim() || '{}');
     } catch (e) { return { key, clef, abc: "", events: [] }; }
+}
+
+// --- SFX SCRIPT ANALYSIS (NEW) ---
+export const analyzeScriptForSFX = async (scriptText: string): Promise<GeneratedSFXList> => {
+    if (!apiKey || apiKey === 'YOUR_API_KEY') {
+        return mockDelay({
+            suggestions: [
+                { id: '1', textContext: 'Se abre la puerta', soundDescription: 'Puerta de madera rechinando' },
+                { id: '2', textContext: 'cae un rayo', soundDescription: 'Trueno fuerte y estruendoso' }
+            ]
+        });
+    }
+    try {
+        const prompt = `Analiza este guion y sugiere efectos de sonido (SFX). 
+        Texto: "${scriptText}".
+        Devuelve JSON: { suggestions: [{ id, textContext, soundDescription }] }.`;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
+        return JSON.parse(response.text?.replace(/```json|```/g, '').trim() || '{}');
+    } catch (e) { return { suggestions: [] }; }
 }

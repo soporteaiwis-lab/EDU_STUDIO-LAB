@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Track, UserMode, InstrumentType } from '../types';
-import { Volume2, Mic, Music, Disc, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid } from 'lucide-react';
+import { Track, UserMode } from '../types';
+import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 interface TrackBlockProps {
@@ -20,7 +20,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
 
   useEffect(() => {
     const generate = () => {
-       if (containerRef.current && track.type === 'AUDIO') {
+       if (containerRef.current && (track.type === 'AUDIO' || track.type === 'SAMPLER')) {
           const width = containerRef.current.clientWidth;
           const height = mode === UserMode.EXPLORER ? 120 : 80; 
           const path = audioService.getWaveformPath(track.id, width, height);
@@ -29,7 +29,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
     };
     const timer = setTimeout(generate, 200);
     return () => clearTimeout(timer);
-  }, [track.id, track.audioUrl, mode, track.type]);
+  }, [track.id, track.audioUrl, track.samplerUrl, mode, track.type]);
 
   const getIcon = () => {
     const size = mode === UserMode.EXPLORER ? 32 : 16;
@@ -41,6 +41,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
         case 'VOCAL': return <Mic {...props} />;
         case 'WIND': return <Wind {...props} />;
         case 'FX': return <Zap {...props} />;
+        case 'SAMPLER': return <MousePointerClick {...props} />;
         case 'CHORD': return <Grid {...props} />;
         default: return track.type === 'MIDI' ? <Piano {...props} /> : <Music {...props} />;
     }
@@ -49,35 +50,45 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
   const isSelectedClass = track.isSelected && mode !== UserMode.EXPLORER ? 'ring-2 ring-blue-500 z-10' : '';
   const stickyHeaderStyle = "sticky left-0 z-20 shadow-r-md";
 
-  // Handle Chord Click (Preview)
-  const handleChordClick = (e: React.MouseEvent, chordName: string) => {
-      e.stopPropagation();
-      audioService.previewChord(chordName);
-  };
+  // --- CONTENT RENDERERS ---
 
-  const renderChordContent = () => {
-      const pixelsPerBar = 160; 
-      return (
-        <div className="relative w-full h-full flex items-center">
-            {track.chordData?.map((chord, idx) => (
-                <div 
-                    key={idx}
-                    onClick={(e) => handleChordClick(e, chord.name)}
-                    className="absolute h-16 bg-white border-2 border-blue-500 rounded-lg flex items-center justify-center shadow-sm z-10 hover:bg-blue-50 cursor-pointer active:scale-95 transition-transform"
-                    style={{ left: `${(chord.bar - 1) * pixelsPerBar}px`, width: `${pixelsPerBar - 4}px`, top: '4px' }}
-                >
-                    <span className="text-xl font-black text-blue-800">{chord.name}</span>
-                </div>
-            ))}
-            <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px)] bg-[size:160px_100%]"></div>
-        </div>
-      );
-  };
+  const renderChordContent = () => (
+    <div className="relative w-full h-full flex items-center">
+        {track.chordData?.map((chord, idx) => (
+            <div key={idx} onClick={(e) => {e.stopPropagation(); audioService.previewChord(chord.name)}} className="absolute h-16 bg-white border-2 border-blue-500 rounded-lg flex items-center justify-center shadow-sm z-10 hover:bg-blue-50 cursor-pointer active:scale-95 transition-transform" style={{ left: `${(chord.bar - 1) * 160}px`, width: `156px`, top: '4px' }}>
+                <span className="text-xl font-black text-blue-800">{chord.name}</span>
+            </div>
+        ))}
+        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px)] bg-[size:160px_100%]"></div>
+    </div>
+  );
 
-  // --- RENDER ---
+  const renderSamplerContent = () => (
+      <div className="w-full h-full flex items-center p-4 bg-gray-900/50">
+          <button 
+            onMouseDown={(e) => { e.stopPropagation(); audioService.triggerSampler(track.id); }}
+            className="w-32 h-full bg-orange-500 rounded-lg shadow-lg border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex flex-col items-center justify-center text-white font-bold hover:bg-orange-400 transition-all"
+          >
+              <Zap size={20} className="mb-1"/>
+              TRIGGER
+          </button>
+          <div className="ml-4 flex-1 h-12 bg-black/40 rounded flex items-center justify-center relative overflow-hidden">
+               {waveformPath && <svg height="100%" width="100%" preserveAspectRatio="none"><path d={waveformPath} fill="none" stroke="#f97316" strokeWidth="2" /></svg>}
+          </div>
+      </div>
+  );
+
+  const renderAudioContent = () => (
+     <div className={`relative h-full w-full flex items-center justify-center opacity-80 z-10 ${track.color.replace('bg-', mode===UserMode.PRO ? 'bg-opacity-10 ' : 'bg-opacity-10 ')}`}>
+         {waveformPath && <svg height={mode===UserMode.PRO?60:80} width="100%" preserveAspectRatio="none" className="w-full h-full"><path d={waveformPath} fill="none" stroke={mode===UserMode.PRO?"#a3a3a3":"#4f46e5"} strokeWidth="2" strokeLinecap="round" /></svg>}
+     </div>
+  );
+
+  // --- MAIN RENDER ---
   const isPro = mode === UserMode.PRO;
   const containerClass = isPro ? "bg-gray-800 border-gray-900 h-24 mb-1" : (mode === UserMode.EXPLORER ? "h-32 mb-4 rounded-2xl shadow-md border-4 border-white/30" : "bg-white border-gray-100 h-28 mb-2 shadow-sm");
   
+  // Explorer Mode
   if (mode === UserMode.EXPLORER) {
       return (
         <div className={`flex w-full ${containerClass} ${track.color} overflow-hidden relative shrink-0`}>
@@ -87,12 +98,13 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
                 <button onClick={() => onDelete(track.id)} className="p-2 rounded-full bg-white/20 text-white mt-2 hover:bg-red-500"><Trash2 size={20}/></button>
             </div>
             <div className="flex-1 relative flex items-center bg-black/5 min-w-[800px]" ref={containerRef}>
-                {track.type === 'CHORD' ? renderChordContent() : <div className="w-full h-20 opacity-70">{waveformPath && <svg height="100%" width="100%"><path d={waveformPath} fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" /></svg>}</div>}
+                {track.type === 'CHORD' ? renderChordContent() : track.type === 'SAMPLER' ? renderSamplerContent() : renderAudioContent()}
             </div>
         </div>
       );
   }
 
+  // Maker/Pro Mode
   return (
       <div onClick={() => onSelect(track.id)} className={`flex w-full ${containerClass} overflow-hidden group transition-all cursor-pointer ${isSelectedClass} shrink-0`}>
          <div className={`w-64 ${stickyHeaderStyle} ${isPro ? 'bg-gray-900 border-black text-gray-300' : 'bg-gray-50 border-gray-100'} border-r flex flex-col p-3 justify-between relative flex-shrink-0`}>
@@ -105,21 +117,24 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
                     </div>
                     <button onClick={(e) => {e.stopPropagation(); onDelete(track.id);}} className="text-gray-500 hover:text-red-400"><Trash2 size={14}/></button>
                  </div>
+                 {/* CONTROLS */}
                  {track.type !== 'CHORD' && (
                     <div className="flex items-center space-x-1 mt-2">
                         <button onClick={(e) => {e.stopPropagation(); onToggleMute(track.id);}} className={`px-2 py-0.5 rounded text-[10px] font-bold ${track.isMuted ? 'bg-yellow-500 text-black' : 'bg-gray-200 text-gray-500'}`}>M</button>
                         <button onClick={(e) => {e.stopPropagation(); onToggleSolo(track.id);}} className={`px-2 py-0.5 rounded text-[10px] font-bold ${track.isSolo ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'}`}>S</button>
-                        <button onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} className={`p-1 rounded-full ${track.isArmed ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-400'}`}><CircleDot size={12}/></button>
+                        <button 
+                            onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
+                            className={`p-1 rounded-full border ${track.isArmed ? 'bg-red-500 text-white border-red-600 animate-pulse' : 'bg-gray-200 text-gray-400 border-transparent'}`}
+                            title={track.isArmed ? "Armada para grabar" : "Click para armar"}
+                        >
+                            <CircleDot size={12}/>
+                        </button>
                     </div>
                  )}
              </div>
          </div>
          <div className={`flex-1 relative overflow-hidden flex items-center min-w-[800px] ${isPro ? 'bg-gray-800' : 'bg-gray-50'}`} ref={containerRef}>
-            {track.type === 'CHORD' ? renderChordContent() : (
-                <div className={`relative h-full w-full flex items-center justify-center opacity-80 z-10 ${track.color.replace('bg-', isPro ? 'bg-opacity-10 ' : 'bg-opacity-10 ')}`}>
-                    {waveformPath && <svg height={isPro ? 60 : 80} width="100%" preserveAspectRatio="none" className="w-full h-full"><path d={waveformPath} fill="none" stroke={isPro ? "#a3a3a3" : "#4f46e5"} strokeWidth="2" strokeLinecap="round" /></svg>}
-                </div>
-            )}
+            {track.type === 'CHORD' ? renderChordContent() : track.type === 'SAMPLER' ? renderSamplerContent() : renderAudioContent()}
          </div>
       </div>
   );
