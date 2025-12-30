@@ -5,10 +5,10 @@ import { Inspector } from './Inspector';
 import { Browser } from './Browser';
 import { LyricsPanel } from './LyricsPanel';
 import { TimelineRuler } from './TimelineRuler';
-import { CreativeAssistant } from './CreativeAssistant';
+import { CreativeEditor } from './CreativeEditor';
 import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
-import { Track, UserMode, MetronomeConfig, GeneratedChords } from '../types';
+import { Track, UserMode, MetronomeConfig, GeneratedChords, GeneratedRhythm, GeneratedMelody } from '../types';
 import { Play, Square, Sparkles, Home, Download, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save } from 'lucide-react';
 
 interface StudioProps {
@@ -18,11 +18,10 @@ interface StudioProps {
 
 const INITIAL_TRACKS: Track[] = [
   { 
-    id: '1', name: 'Batería Demo', type: 'AUDIO', instrument: 'DRUMS', color: 'bg-rose-500', 
+    id: '1', name: 'Batería Demo', type: 'DRUMS', instrument: 'DRUMS', color: 'bg-rose-500', 
     volume: 80, pan: 0, eq: { low: 0, mid: 0, high: 0 }, 
     effects: { reverb: 0, pitch: 0, distortion: 0 },
-    isMuted: false, isSolo: false, isArmed: false, 
-    audioUrl: 'https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3' 
+    isMuted: false, isSolo: false, isArmed: false 
   },
 ];
 
@@ -46,7 +45,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [showInspector, setShowInspector] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [showAI, setShowAI] = useState(false);
+  const [showCreative, setShowCreative] = useState(false);
 
   const [lyricsContent, setLyricsContent] = useState('');
   const [bpm, setBpm] = useState(120);
@@ -55,10 +54,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const isExplorer = userMode === UserMode.EXPLORER;
   const bgMain = isPro ? 'bg-gray-900 text-gray-200' : isExplorer ? 'bg-lego text-gray-800' : 'bg-gray-50 text-gray-700';
 
+  // --- AUDIO INIT ---
   useEffect(() => {
     tracks.forEach(t => { 
-        if(t.type === 'AUDIO' && t.audioUrl) audioService.addTrack(t.id, t.audioUrl);
-        if(t.type === 'CHORD' || t.type === 'MIDI') audioService.addTrack(t.id, '', true);
+        if(t.type === 'AUDIO' && t.audioUrl) audioService.addTrack(t.id, t.audioUrl, 'AUDIO');
+        if(t.type === 'CHORD' || t.type === 'MIDI' || t.type === 'MELODY') audioService.addTrack(t.id, '', 'INSTRUMENT');
+        if(t.type === 'RHYTHM' || t.type === 'DRUMS') audioService.addTrack(t.id, '', 'DRUMS');
     });
     return () => { audioService.stop(); }
   }, []);
@@ -77,17 +78,17 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     return () => { if(animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, []);
 
-  // --- Transport ---
+  // --- PLAYBACK ---
   const handlePlayToggle = async () => {
     await audioService.initialize();
     if (isPlaying) { 
         audioService.pause(); 
     } else { 
-        // Schedule Chords before playing
+        // Schedule all generative tracks
         tracks.forEach(t => {
-            if (t.type === 'CHORD' && t.chordData) {
-                audioService.scheduleChords(t.id, t.chordData);
-            }
+            if (t.type === 'CHORD' && t.chordData) audioService.scheduleChords(t.id, t.chordData);
+            if ((t.type === 'RHYTHM' || t.type === 'DRUMS') && t.rhythmData) audioService.scheduleDrums(t.id, t.rhythmData);
+            if (t.type === 'MELODY' && t.melodyData) audioService.scheduleMelody(t.id, t.melodyData);
         });
         audioService.play(); 
     }
@@ -111,97 +112,80 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     }
   };
 
-  // --- Session Management ---
+  // --- AI IMPORTERS ---
+  const handleImportLyrics = (text: string) => {
+      setLyricsContent(prev => prev + (prev ? '\n\n' : '') + text);
+      setShowLyrics(true);
+  };
+  const handleImportChords = (data: GeneratedChords) => {
+      const id = Date.now().toString();
+      const track: Track = { 
+          id, name: `Acordes (${data.key})`, type: 'CHORD', instrument: 'CHORD', color: 'bg-blue-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, chordData: data.progression 
+      };
+      setTracks(prev => [...prev, track]);
+      audioService.addTrack(id, '', 'INSTRUMENT');
+  };
+  const handleImportRhythm = (data: GeneratedRhythm) => {
+      const id = Date.now().toString();
+      const track: Track = {
+          id, name: `Batería (${data.style})`, type: 'RHYTHM', instrument: 'DRUMS', color: 'bg-red-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, rhythmData: data.events
+      };
+      setTracks(prev => [...prev, track]);
+      audioService.addTrack(id, '', 'DRUMS');
+  };
+  const handleImportMelody = (data: GeneratedMelody) => {
+      const id = Date.now().toString();
+      const track: Track = {
+          id, name: `Melodía (${data.key})`, type: 'MELODY', instrument: 'KEYS', color: 'bg-yellow-400', volume: 80, pan: 0, eq: {low:0,mid:0,high:0}, effects: {reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, melodyData: data.events
+      };
+      setTracks(prev => [...prev, track]);
+      audioService.addTrack(id, '', 'INSTRUMENT');
+  };
+
+  // --- GENERIC ACTIONS ---
   const handleSaveSession = () => {
-      storageService.saveSession({
-          id: sessionId,
-          name: sessionName,
-          lastModified: Date.now(),
-          bpm: bpm,
-          tracks: tracks
-      });
+      storageService.saveSession({ id: sessionId, name: sessionName, lastModified: Date.now(), bpm, tracks });
       alert('Proyecto guardado en tu nube local.');
   };
 
   const handleLoadSession = (session: any) => {
       handleStop();
-      setSessionId(session.id);
-      setSessionName(session.name);
-      setBpm(session.bpm);
-      setTracks(session.tracks);
-      // Re-initialize audio engine with new tracks
+      setSessionId(session.id); setSessionName(session.name); setBpm(session.bpm); setTracks(session.tracks);
       session.tracks.forEach((t: Track) => {
-         if(t.type === 'AUDIO' && t.audioUrl) audioService.addTrack(t.id, t.audioUrl);
-         if(t.type === 'CHORD') audioService.addTrack(t.id, '', true);
+         if(t.type === 'AUDIO' && t.audioUrl) audioService.addTrack(t.id, t.audioUrl, 'AUDIO');
+         else if(t.type === 'RHYTHM' || t.type === 'DRUMS') audioService.addTrack(t.id, '', 'DRUMS');
+         else audioService.addTrack(t.id, '', 'INSTRUMENT');
       });
       setShowBrowser(false);
   };
 
-  // --- Recording ---
   const handleRecordToggle = async () => {
     if (isRecording) {
       const audioUrl = await audioService.stopRecording();
-      setIsRecording(false);
-      handleStop(); 
+      setIsRecording(false); handleStop(); 
       const targetId = recordingTrackIdRef.current; 
       if (audioUrl && targetId) {
-         await audioService.addTrack(targetId, audioUrl);
+         await audioService.addTrack(targetId, audioUrl, 'AUDIO');
          setTracks(prev => prev.map(t => t.id === targetId ? { ...t, audioUrl: audioUrl, isArmed: false } : t));
-         recordingTrackIdRef.current = null;
       }
       return;
     }
-
-    let targetTrackId: string | null = null;
-    const existingArmed = tracks.find(t => t.isArmed);
-
-    if (isExplorer) {
-        const newId = Date.now().toString();
-        const newTrack: Track = { id: newId, name: `Voz ${tracks.length + 1}`, type: 'AUDIO', instrument: 'VOCAL', color: 'bg-rose-500', volume: 80, pan: 0, eq: {low:0, mid:0, high:0}, effects: { reverb: 0, pitch: 0, distortion: 0 }, isMuted: false, isSolo: false, isArmed: true };
-        setTracks(prev => [...prev, newTrack]);
-        targetTrackId = newId;
-    } else {
-        if (!existingArmed) return alert("¡Arma una pista!");
-        targetTrackId = existingArmed.id;
-    }
-
-    try {
-        await audioService.startRecording();
-        recordingTrackIdRef.current = targetTrackId;
-        setIsRecording(true);
-        if (!isPlaying) audioService.play();
-    } catch (e) { alert("Error mic"); }
+    const target = tracks.find(t => t.isArmed);
+    if (!target) return alert("Arma una pista!");
+    try { await audioService.startRecording(); recordingTrackIdRef.current = target.id; setIsRecording(true); if(!isPlaying) audioService.play(); } 
+    catch(e) { alert("Error mic"); }
   };
 
-  const handleImport = async (url: string, name: string, type: 'AUDIO'|'MIDI') => {
-      const newId = Date.now().toString();
-      const newTrack: Track = { id: newId, name: name, type: type, instrument: type === 'MIDI' ? 'KEYS' : 'UNKNOWN', color: 'bg-emerald-500', volume: 80, pan: 0, eq: {low:0, mid:0, high:0}, effects: { reverb: 0, pitch: 0, distortion: 0 }, isMuted: false, isSolo: false, isArmed: false, audioUrl: type === 'AUDIO' ? url : undefined };
-      if (type === 'AUDIO') await audioService.addTrack(newId, url);
-      setTracks(prev => [...prev, newTrack]);
-  };
-
-  const addTrack = (type: 'AUDIO'|'MIDI', name?: string) => {
-      const newT: Track = { id: Date.now().toString(), name: name || (type === 'AUDIO' ? 'Audio Nuevo' : 'Inst. Nuevo'), type: type, instrument: type === 'AUDIO' ? 'VOCAL' : 'KEYS', color: 'bg-gray-500', volume: 80, pan: 0, eq: {low:0, mid:0, high:0}, effects: { reverb: 0, pitch: 0, distortion: 0 }, isMuted: false, isSolo: false, isArmed: false };
+  const addTrack = (type: 'AUDIO'|'MIDI') => {
+      const id = Date.now().toString();
+      const newT: Track = { id, name: type==='AUDIO'?'Audio Nuevo':'Inst. Nuevo', type: type, instrument: type==='AUDIO'?'VOCAL':'KEYS', color: 'bg-gray-500', volume: 80, pan: 0, eq:{low:0,mid:0,high:0}, effects:{reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false };
       setTracks(prev => [...prev, newT]);
-      if(type === 'MIDI') audioService.addTrack(newT.id, '', true);
-  };
-
-  const handleAcceptAIChords = (data: GeneratedChords) => {
-      const chordTrack: Track = { id: Date.now().toString(), name: `Acordes (${data.key})`, type: 'CHORD', instrument: 'CHORD', color: 'bg-blue-400', volume: 80, pan: 0, eq: {low:0, mid:0, high:0}, effects: { reverb: 0, pitch: 0, distortion: 0 }, isMuted: false, isSolo: false, isArmed: false, chordData: data.progression };
-      setTracks(prev => [...prev, chordTrack]);
-      // Init synth for this chord track
-      audioService.addTrack(chordTrack.id, '', true);
-      if (data.melodyHint) {
-          setLyricsContent(prev => prev + `\n\n[IDEA MELÓDICA - ABC]\n${data.melodyHint}`);
-          setShowLyrics(true);
-      }
+      audioService.addTrack(id, '', type==='AUDIO'?'AUDIO':'INSTRUMENT');
   };
 
   const gridLines = useMemo(() => {
     const lines = [];
-    for(let i=0; i<50; i++) {
-        lines.push(<div key={`bar-${i}`} className={`absolute top-0 bottom-0 w-px border-l ${isPro ? 'border-gray-600' : 'border-gray-400'} pointer-events-none opacity-50`} style={{left: `${HEADER_WIDTH + (i * 160)}px`}}></div>);
-    }
+    for(let i=0; i<50; i++) lines.push(<div key={`bar-${i}`} className={`absolute top-0 bottom-0 w-px border-l ${isPro ? 'border-gray-600' : 'border-gray-400'} pointer-events-none opacity-50`} style={{left: `${HEADER_WIDTH + (i * 160)}px`}}></div>);
     return lines;
   }, [bpm, isPro]);
 
@@ -217,7 +201,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 </div>
             </div>
             <div className="flex items-center space-x-2">
-                 <button onClick={() => setShowAI(true)} className="flex items-center space-x-2 px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-full font-bold text-[10px] hover:brightness-110"><Sparkles size={12}/><span>IA MAGIC</span></button>
+                 <button onClick={() => setShowCreative(true)} className="flex items-center space-x-2 px-3 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full font-bold text-[10px] hover:scale-105 transition-transform"><Sparkles size={12}/><span>EDITOR CREATIVO</span></button>
             </div>
         </div>
 
@@ -229,10 +213,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                  <button onClick={handlePlayToggle} className={`p-1.5 rounded-full ${isPlaying ? 'bg-amber-500 text-white' : 'hover:bg-black/20 text-green-500'}`}>{isPlaying ? <Pause size={24} fill="currentColor"/> : <Play size={24} fill="currentColor"/>}</button>
                  <button onClick={handleRecordToggle} className={`p-1.5 rounded-full ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'hover:bg-black/20 text-red-500'}`}><Circle size={20} fill="currentColor"/></button>
              </div>
-             <div className="w-px h-6 bg-gray-500/30"></div>
              <div className="flex items-center space-x-4 font-mono">
-                 <div className="flex flex-col items-center leading-none group"><span className="text-xl font-bold text-blue-400">{bpm}</span><span className="text-[9px] text-gray-500">BPM</span></div>
-                 <div className="flex flex-col items-center leading-none"><span className="text-xl font-bold text-gray-400">4/4</span><span className="text-[9px] text-gray-500">SIG</span></div>
+                 <div className="flex flex-col items-center leading-none"><span className="text-xl font-bold text-blue-400">{bpm}</span><span className="text-[9px] text-gray-500">BPM</span></div>
              </div>
              <div className="flex-1"></div>
              <div className="flex items-center space-x-2 border-l border-gray-500/30 pl-4">
@@ -244,28 +226,28 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
 
         {/* WORKSPACE */}
         <div className="flex-1 flex overflow-hidden min-h-0">
-            {!isExplorer && showInspector && selectedTrackId && <Inspector track={tracks.find(t => t.id === selectedTrackId)} mode={userMode} onUpdate={(id, up) => { setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t)); }} onClose={() => setSelectedTrackId(null)} />}
+            {!isExplorer && showInspector && selectedTrackId && <Inspector track={tracks.find(t => t.id === selectedTrackId)} mode={userMode} onUpdate={(id, up) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t))} onClose={() => setSelectedTrackId(null)} />}
             <div className="flex-1 flex flex-col min-w-0 relative h-full">
                 <div ref={timelineContainerRef} className="flex-1 overflow-auto relative scroll-smooth bg-opacity-10 cursor-crosshair bg-black/20" onMouseDown={(e) => { if(e.target === timelineContainerRef.current) handleSeek(e); }}>
-                     <div className="sticky top-0 z-30 w-fit" onMouseDown={handleSeek}><TimelineRuler mode={userMode} bpm={bpm} zoom={1} paddingLeft={HEADER_WIDTH} /></div>
+                     <div className="sticky top-0 z-30 w-fit"><TimelineRuler mode={userMode} bpm={bpm} zoom={1} paddingLeft={HEADER_WIDTH} /></div>
                      <div className="relative min-w-max pb-32">
                          <div className="absolute top-0 left-0 min-w-full h-full pointer-events-none z-0">{gridLines}</div>
                          <div ref={playheadRef} className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-40 pointer-events-none" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}></div>
                          <div className="relative z-10 pt-2">
                             {tracks.map(track => (<TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} onDelete={(id) => setTracks(prev => prev.filter(t => t.id !== id))} onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} />))}
                          </div>
-                         <div className="mt-4 p-4 border-2 border-dashed border-gray-600/30 rounded-xl flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity w-fit" style={{ marginLeft: HEADER_WIDTH }}>
+                         <div className="mt-4 p-4 flex justify-center opacity-50 hover:opacity-100 transition-opacity w-fit" style={{ marginLeft: HEADER_WIDTH }}>
                              <button onClick={() => addTrack('AUDIO')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold mr-4">+ Audio Track</button>
                              <button onClick={() => addTrack('MIDI')} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold">+ Instrument Track</button>
                         </div>
                      </div>
                 </div>
-                {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.5)] border-t border-gray-700 animate-slide-up relative"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
+                {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
             </div>
-            {showBrowser && <Browser mode={userMode} onImport={handleImport} onLoadSession={handleLoadSession} onClose={() => setShowBrowser(false)} />}
+            {showBrowser && <Browser mode={userMode} onImport={(u,n,t)=> {if(t==='AUDIO') { const id=Date.now().toString(); setTracks(p=>[...p, {id, name:n, type:'AUDIO', instrument:'VOCAL', color:'bg-green-500', volume:80, pan:0, eq:{low:0,mid:0,high:0}, effects:{reverb:0,pitch:0,distortion:0}, isMuted:false, isSolo:false, isArmed:false, audioUrl:u}]); audioService.addTrack(id, u, 'AUDIO'); }}} onLoadSession={handleLoadSession} onClose={() => setShowBrowser(false)} />}
             {showLyrics && <LyricsPanel mode={userMode} content={lyricsContent} onUpdateContent={setLyricsContent} onClose={() => setShowLyrics(false)} />}
         </div>
-        {showAI && <CreativeAssistant onClose={() => setShowAI(false)} onAcceptLyrics={(text) => {setLyricsContent(text); setShowLyrics(true);}} onAcceptChords={handleAcceptAIChords} />}
+        {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={handleImportLyrics} onImportChords={handleImportChords} onImportRhythm={handleImportRhythm} onImportMelody={handleImportMelody} />}
     </div>
   );
 };

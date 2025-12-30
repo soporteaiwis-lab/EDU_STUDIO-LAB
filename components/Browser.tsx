@@ -1,7 +1,8 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { UserMode, Session } from '../types';
 import { Search, Music, Mic2, Youtube, Upload, Sparkles, PlayCircle, FileAudio, Cloud, Trash2, Save } from 'lucide-react';
-import { generateDrumPattern } from '../services/geminiService';
+import { generateRhythm } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 
 interface BrowserProps {
@@ -36,13 +37,13 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
   const handleGenerateDrums = async () => {
       setIsGenerating(true);
       // Generate Pattern Logic
-      const pattern = await generateDrumPattern('Rock Basico');
+      const pattern = await generateRhythm('Rock Basico');
       // In a real app, we would construct a MIDI track. 
       // For this demo, we will import a pre-rendered drum loop as audio to simulate the result
       // because constructing MIDI via Tone.Part in React state is complex for this snippet size.
       // However, we simulate the "AI Work":
       setTimeout(() => {
-          onImport('https://tonejs.github.io/audio/drum-samples/loops/bongo.mp3', `IA: ${pattern.name}`, 'AUDIO');
+          onImport('https://tonejs.github.io/audio/drum-samples/loops/bongo.mp3', `IA: ${pattern.style}`, 'AUDIO');
           setIsGenerating(false);
       }, 1000);
   };

@@ -1,3 +1,4 @@
+
 export enum UserMode {
   EXPLORER = 'EXPLORER', // 7-10 years (Lego blocks, no timeline)
   MAKER = 'MAKER',       // 11-14 years (Colorful, simplified DAW)
@@ -10,9 +11,9 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '1.0',
+  version: '1.2',
   creator: 'Armin Wildo Salazar San Martin',
-  company: 'AWiwis AI & TI Solutions',
+  company: 'AIWIS',
   year: '2025'
 };
 
@@ -28,7 +29,7 @@ export interface TrackEffects {
   distortion: number; // 0 to 1
 }
 
-export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'UNKNOWN';
+export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'MELODY' | 'UNKNOWN';
 
 export interface ChordEvent {
   bar: number; // Bar number (1-based)
@@ -36,10 +37,21 @@ export interface ChordEvent {
   duration: number; // in bars
 }
 
+export interface DrumEvent {
+  time: string; // "0:0:0"
+  instrument: 'KICK' | 'SNARE' | 'HIHAT';
+}
+
+export interface MelodyEvent {
+  note: string; // "C4"
+  duration: string; // "4n"
+  time: string; // "0:0:0"
+}
+
 export interface Track {
   id: string;
   name: string;
-  type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD';
+  type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD' | 'RHYTHM' | 'MELODY' | 'DRUMS';
   instrument: InstrumentType;
   color: string;
   volume: number;
@@ -51,7 +63,9 @@ export interface Track {
   isArmed: boolean;
   audioUrl?: string;
   isSelected?: boolean;
-  chordData?: ChordEvent[]; // For Chord Tracks
+  chordData?: ChordEvent[]; 
+  rhythmData?: DrumEvent[];
+  melodyData?: MelodyEvent[];
 }
 
 export interface MetronomeConfig {
@@ -85,12 +99,20 @@ export interface GeneratedLyrics {
 export interface GeneratedChords {
   key: string;
   progression: ChordEvent[];
-  melodyHint?: string; // ABC Notation string
+  melodyHint?: string;
 }
 
-export interface SongData {
-  lyrics: string;
-  chords: string[]; // Simplification for now
+export interface GeneratedMelody {
+  clef: 'TREBLE' | 'BASS';
+  key: string;
+  events: MelodyEvent[];
+  abc: string;
+}
+
+export interface GeneratedRhythm {
+  style: string;
+  bpm: number;
+  events: DrumEvent[];
 }
 
 export enum EffectType {
