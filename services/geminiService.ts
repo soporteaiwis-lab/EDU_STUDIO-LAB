@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { GeneratedLyrics, GeneratedChords, GeneratedRhythm, GeneratedMelody, GeneratedSFXList } from "../types";
+import { GeneratedLyrics, GeneratedChords, GeneratedRhythm, GeneratedMelody, GeneratedSFXList, Track } from "../types";
 
 const apiKey = process.env.API_KEY || ''; 
 const ai = new GoogleGenAI({ apiKey });
@@ -89,7 +89,7 @@ export const generateMelody = async (key: string, clef: 'TREBLE' | 'BASS'): Prom
     } catch (e) { return { key, clef, abc: "", events: [] }; }
 }
 
-// --- SFX SCRIPT ANALYSIS (NEW) ---
+// --- SFX SCRIPT ANALYSIS ---
 export const analyzeScriptForSFX = async (scriptText: string): Promise<GeneratedSFXList> => {
     if (!apiKey || apiKey === 'YOUR_API_KEY') {
         return mockDelay({
@@ -111,4 +111,36 @@ export const analyzeScriptForSFX = async (scriptText: string): Promise<Generated
         });
         return JSON.parse(response.text?.replace(/```json|```/g, '').trim() || '{}');
     } catch (e) { return { suggestions: [] }; }
+}
+
+// --- AI PRODUCER (NEW INTEGRATION) ---
+export interface ProducerAdvice {
+    message: string;
+    actionLabel?: string;
+    actionType?: 'ADD_DRUMS' | 'FIX_MIX' | 'ADD_CHORDS' | 'NONE';
+}
+
+export const getProducerAdvice = async (tracks: Track[], bpm: number): Promise<ProducerAdvice> => {
+    if (!apiKey || apiKey === 'YOUR_API_KEY') {
+        const hasDrums = tracks.some(t => t.type === 'DRUMS' || t.type === 'RHYTHM');
+        if (!hasDrums) return mockDelay({ message: "¡Tu canción necesita ritmo! ¿Quieres que genere una batería básica para empezar?", actionLabel: "Generar Batería", actionType: "ADD_DRUMS" });
+        return mockDelay({ message: "El proyecto va tomando forma. Revisa los volúmenes, la batería parece un poco fuerte.", actionLabel: "Ajustar Niveles", actionType: "FIX_MIX" });
+    }
+
+    // Prepare context for Gemini
+    const projectContext = tracks.map(t => `${t.name} (${t.type}, Vol:${t.volume})`).join(', ');
+    const prompt = `Actúa como un Productor Musical Junior amigable para niños. Analiza este proyecto: BPM ${bpm}. Pistas: [${projectContext}]. 
+    Dame 1 consejo corto y divertido. Si falta batería, sugierela. Si hay muchas pistas, sugiere mezclar. 
+    Devuelve JSON: { message: "consejo", actionLabel: "texto boton corto", actionType: "ADD_DRUMS" | "ADD_CHORDS" | "FIX_MIX" | "NONE" }`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
+        return JSON.parse(response.text?.replace(/```json|```/g, '').trim() || '{}');
+    } catch (e) {
+        return { message: "¡Sigue creando! Tu música suena interesante.", actionType: 'NONE' };
+    }
 }

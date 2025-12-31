@@ -9,9 +9,10 @@ interface TimelineRulerProps {
   paddingLeft: number; 
   loopRegion: LoopRegion;
   onLoopChange: (region: LoopRegion) => void;
+  totalBars?: number; // New optional prop for dynamic length
 }
 
-export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zoom, paddingLeft, loopRegion, onLoopChange }) => {
+export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zoom, paddingLeft, loopRegion, onLoopChange, totalBars = 100 }) => {
   const [isDragging, setIsDragging] = useState<'START' | 'END' | 'NEW' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
 
@@ -67,9 +68,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
 
   const handleMouseUp = () => setIsDragging(null);
 
-  // Markers generation
+  // Markers generation based on totalBars prop
   const markers = [];
-  const totalBars = 100; // Limit visualization to 100 bars
   
   for (let i = 0; i < totalBars; i++) {
       const leftPos = (i * pixelsPerBar) + paddingLeft;
