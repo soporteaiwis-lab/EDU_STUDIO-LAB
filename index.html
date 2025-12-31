@@ -3,23 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EduStudio Modular</title>
+    <title>EduStudio Pro | AIWIS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        --bg-dark: #0f172a;
+        --bg-panel: #1e293b;
+        --accent: #8b5cf6;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+      }
       body {
         font-family: 'Nunito', sans-serif;
+        background-color: var(--bg-dark);
+        color: var(--text-primary);
+        overflow: hidden; /* App-like feel */
       }
-      h1, h2, h3, h4, button {
+      h1, h2, h3, h4, button, .font-display {
         font-family: 'Fredoka', sans-serif;
       }
-      /* LEGO-like stud effect pattern */
-      .bg-lego {
-        background-color: #f3f4f6;
-        background-image: radial-gradient(#e5e7eb 15%, transparent 16%), radial-gradient(#e5e7eb 15%, transparent 16%);
-        background-size: 20px 20px;
-        background-position: 0 0, 10px 10px;
+      
+      /* New "Armonia" Pro Background */
+      .bg-studio-dark {
+        background: radial-gradient(circle at top right, #312e81 0%, #1e1b4b 40%, #000000 100%);
+        background-attachment: fixed;
       }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+        background: #0f172a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+
+      /* Animations */
+      .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+      .animate-slide-up { animation: slideUp 0.4s ease-out; }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
   <script type="importmap">
 {
@@ -34,7 +63,7 @@
 }
 </script>
 </head>
-  <body>
+  <body class="bg-studio-dark">
     <div id="root"></div>
   </body>
 </html>

@@ -42,6 +42,7 @@ class AudioService {
   private isInitialized: boolean = false;
   private isRecordingMidi: boolean = false;
   private sustainEnabled: boolean = false;
+  private metronomeVolumeValue: number = -10; // dB
 
   private chordMap: Record<string, string[]> = {
       'C': ['C4', 'E4', 'G4'], 'Cm': ['C4', 'Eb4', 'G4'], 'C7': ['C4', 'E4', 'G4', 'Bb4'],
@@ -63,8 +64,8 @@ class AudioService {
         // Metronome
         this.metronomeSynth = new Tone.MembraneSynth({ pitchDecay: 0.008, octaves: 2, oscillator: { type: 'sine' } }).toDestination();
         this.metronomeClick = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination();
-        this.metronomeSynth.volume.value = -10;
-        if(this.metronomeClick) this.metronomeClick.volume.value = -15;
+        
+        this.setMetronomeVolume(this.metronomeVolumeValue);
 
         // Preview Synth (Fallback)
         this.previewSynth = new Tone.PolySynth(Tone.Synth).toDestination();
@@ -78,6 +79,12 @@ class AudioService {
 
         this.isInitialized = true;
     }
+  }
+
+  setMetronomeVolume(db: number) {
+      this.metronomeVolumeValue = db;
+      if (this.metronomeSynth) this.metronomeSynth.volume.value = db;
+      if (this.metronomeClick) this.metronomeClick.volume.value = db - 5; // Click slightly quieter
   }
 
   // --- DEVICE MANAGEMENT ---
@@ -240,13 +247,10 @@ class AudioService {
       
       if (enabled) {
           const numerator = this.timeSignature[0];
-          // Determine loop interval based on time signature. Usually '4n' (quarter note) is standard beat.
-          // For 6/8, beats are dotted quarters or eighths depending on feel, sticking to quarters for simplicity or '8n' if denominator is 8.
           const subdivision = this.timeSignature[1] === 8 ? '8n' : '4n';
 
           let counter = 0;
           this.metronomeLoop = new Tone.Loop((time) => {
-              // Standard accent on first beat
               if (counter % numerator === 0) {
                   this.metronomeClick?.triggerAttackRelease("C6", "32n", time);
               } else {

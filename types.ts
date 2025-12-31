@@ -11,7 +11,7 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '2.2.0 MIDI-PRO',
+  version: '3.0.0 PRO-X',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
@@ -21,6 +21,12 @@ export interface AudioDevice {
   deviceId: string;
   label: string;
   kind: MediaDeviceKind;
+}
+
+export interface LoopRegion {
+  startBar: number; // Start in Bars (1-indexed or 0-indexed depending on logic, let's use 0-indexed internally)
+  endBar: number;   // End in Bars
+  isActive: boolean;
 }
 
 export interface ProjectState {
