@@ -12,7 +12,7 @@ import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
 import { getProducerAdvice, ProducerAdvice } from '../services/geminiService';
 import { Track, UserMode, SongMetadata, MidiNote, AudioDevice, LoopRegion } from '../types';
-import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown, Library, Layers, Box, Maximize, Bot, Baby, Hammer, Zap as ZapIcon } from 'lucide-react';
+import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown, Library, Layers, Box, Maximize, Bot, Baby, Hammer, Zap as ZapIcon, Check } from 'lucide-react';
 
 interface StudioProps {
   userMode: UserMode;
@@ -58,10 +58,11 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const [loopRegion, setLoopRegion] = useState<LoopRegion>({ startBar: 1, endBar: 5, isActive: true });
   
   // Dynamic Project Length
-  const [totalBars, setTotalBars] = useState(32); // Start with 32 bars min
+  const [totalBars, setTotalBars] = useState(64); // Increased default bars
 
   // Metronome Settings State
   const [showMetronomeSettings, setShowMetronomeSettings] = useState(false);
+  const [showTimeSigSelector, setShowTimeSigSelector] = useState(false); // NEW STATE
   const [metronomeVolume, setMetronomeVolume] = useState(-10);
   const [countIn, setCountIn] = useState<'OFF' | '1BAR' | '2BAR'>('OFF');
   const [tapTempoTaps, setTapTempoTaps] = useState<number[]>([]);
@@ -109,28 +110,28 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                 maxTime = lastNote.startTime + lastNote.duration;
             }
         }
-        // Approximate audio tracks as 30s if loaded, or use loop region
-        if (t.type === 'AUDIO' && maxTime < 30) maxTime = 30; 
+        // Approximate audio tracks
+        if (t.type === 'AUDIO' && maxTime < 60) maxTime = 60; 
     });
 
     const secondsPerBar = (60 / bpm) * 4;
-    const calculatedBars = Math.ceil(maxTime / secondsPerBar) + 8; // Add 8 bars padding
-    setTotalBars(Math.max(32, calculatedBars)); // Minimum 32 bars
+    const calculatedBars = Math.ceil(maxTime / secondsPerBar) + 16; // Add generous padding
+    // Ensure we don't shrink below user edits or default view
+    setTotalBars(Math.max(64, calculatedBars)); 
   }, [tracks, bpm]);
 
   // --- AI PRODUCER CHECK ---
   useEffect(() => {
-      // Analyze project every time tracks change significantly (debounce could be added)
       if (tracks.length > 0) {
          const timeout = setTimeout(async () => {
              const advice = await getProducerAdvice(tracks, bpm);
              setProducerAdvice(advice);
              setShowProducer(true);
-             setTimeout(() => setShowProducer(false), 8000); // Auto hide after 8s
+             setTimeout(() => setShowProducer(false), 8000); 
          }, 5000);
          return () => clearTimeout(timeout);
       }
-  }, [tracks.length]); // Analyze when track count changes
+  }, [tracks.length]);
 
   // --- AUDIO INIT ---
   useEffect(() => {
@@ -154,6 +155,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
     const handleClickOutside = (event: MouseEvent) => {
         if (metronomeRef.current && !metronomeRef.current.contains(event.target as Node)) {
             setShowMetronomeSettings(false);
+            setShowTimeSigSelector(false);
         }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -171,6 +173,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   useEffect(() => {
       const [num, den] = timeSignature.split('/').map(Number);
       audioService.setTimeSignature(num, den);
+      setMetadata(prev => ({...prev, timeSignature: [num, den]}));
   }, [timeSignature]);
 
   useEffect(() => {
@@ -215,9 +218,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
       const availableWidth = timelineContainerRef.current.clientWidth - HEADER_WIDTH;
       const secondsPerBar = (60 / bpm) * 4;
       const totalSeconds = totalBars * secondsPerBar;
-      // Calculate zoom to fit totalBars into availableWidth
-      // width = totalSeconds * 40 * zoom
-      // zoom = width / (totalSeconds * 40)
       const newZoom = availableWidth / (totalSeconds * 40);
       setZoom(Math.max(0.1, Math.min(3, newZoom)));
   };
@@ -354,7 +354,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const gridLines = useMemo(() => {
     const lines = [];
     const pixelsPerBar = (60 / bpm) * 4 * (40 * zoom);
-    // Use totalBars state instead of hardcoded 100
     for(let i=0; i<totalBars; i++) {
         lines.push(
             <div key={`bar-${i}`} className="absolute top-0 bottom-0 w-px border-l border-white/5 pointer-events-none" style={{left: `${HEADER_WIDTH + (i * pixelsPerBar)}px`}}></div>
@@ -374,7 +373,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
     return lines;
   }, [bpm, zoom, totalBars]);
 
-  const totalTrackWidth = HEADER_WIDTH + (totalBars * (60 / bpm) * 4 * (40 * zoom)) + 100; // Extra padding
+  // Important: We calculate track width dynamically to ensure content is reachable
+  const trackContentWidth = (totalBars * (60 / bpm) * 4 * (40 * zoom)) + 100;
+  const totalContainerWidth = HEADER_WIDTH + trackContentWidth;
 
   // Execute AI Suggestion
   const applyProducerAdvice = () => {
@@ -436,7 +437,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
 
                  <div className="w-px h-8 bg-white/5 mx-2 hidden md:block"></div>
                  
-                 {/* RESTORED MODE SWITCHER */}
                  <ModeSwitcher />
 
                  <div className="w-px h-8 bg-white/5 mx-2 hidden md:block"></div>
@@ -463,14 +463,19 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
              {/* Center Display (LCD) */}
              <div className="relative mx-4 flex-1 max-w-[400px] hidden lg:block" ref={metronomeRef}>
                  <div className="bg-[#050505] rounded-xl border border-white/10 p-1 flex items-center justify-between shadow-inner h-14 px-6 relative">
+                     
+                     {/* BPM CONTROL */}
                      <div className="flex flex-col items-center border-r border-white/5 pr-6 cursor-pointer hover:bg-white/5 h-full justify-center transition rounded-l-lg" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
                          <span className="text-[9px] font-bold text-gray-500 tracking-wider">BPM</span>
                          <span className="text-xl font-mono font-bold text-cyan-400 leading-none">{bpm}</span>
                      </div>
-                     <div className="flex flex-col items-center border-r border-white/5 px-6 h-full justify-center">
+                     
+                     {/* TIME SIGNATURE CONTROL (NEW) */}
+                     <div className="flex flex-col items-center border-r border-white/5 px-6 h-full justify-center cursor-pointer hover:bg-white/5 transition" onClick={() => setShowTimeSigSelector(!showTimeSigSelector)}>
                           <span className="text-[9px] font-bold text-gray-500">COMPÁS</span>
-                          <span className="text-lg font-mono font-bold text-gray-300 leading-none">{timeSignature}</span>
+                          <span className="text-lg font-mono font-bold text-gray-300 leading-none flex items-center">{timeSignature} <ChevronDown size={10} className="ml-1 opacity-50"/></span>
                      </div>
+
                      <div className="flex flex-col items-center px-6 h-full justify-center">
                           <span className="text-[9px] font-bold text-gray-500">TIEMPO</span>
                           <span className="text-lg font-mono font-bold text-gray-300 leading-none">
@@ -482,6 +487,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                         <Settings size={16} className={metronomeOn ? "animate-spin-slow" : ""}/>
                      </button>
                  </div>
+                 
+                 {/* METRONOME DROPDOWN */}
                  {showMetronomeSettings && (
                      <div className="absolute top-16 left-0 right-0 bg-[#151515] border border-white/10 rounded-xl shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-3 glass-panel">
                          <div className="flex justify-between items-center bg-black/40 p-2 rounded-lg border border-white/5">
@@ -492,6 +499,23 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                              <div className="flex justify-between text-[10px] font-bold text-gray-500"><span>Volumen Click</span><span>{metronomeVolume} dB</span></div>
                              <input type="range" min="-40" max="0" value={metronomeVolume} onChange={(e) => setMetronomeVolume(parseInt(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:bg-cyan-500"/>
                          </div>
+                     </div>
+                 )}
+
+                 {/* TIME SIGNATURE DROPDOWN */}
+                 {showTimeSigSelector && (
+                     <div className="absolute top-16 left-24 w-32 bg-[#151515] border border-white/10 rounded-xl shadow-2xl p-2 z-[100] animate-slide-up glass-panel">
+                        <div className="text-[9px] font-bold text-gray-500 uppercase mb-2 px-2">Métrica</div>
+                        {['4/4', '3/4', '2/4', '6/8', '12/8', '5/4'].map(sig => (
+                            <button 
+                                key={sig}
+                                onClick={() => { setTimeSignature(sig); setShowTimeSigSelector(false); }}
+                                className={`w-full text-left p-2 rounded text-xs font-bold flex justify-between items-center ${timeSignature === sig ? 'bg-cyan-900/30 text-cyan-400' : 'text-gray-300 hover:bg-white/5'}`}
+                            >
+                                {sig}
+                                {timeSignature === sig && <Check size={12}/>}
+                            </button>
+                        ))}
                      </div>
                  )}
              </div>
@@ -533,7 +557,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                      </div>
 
                      {/* Tracks Container with Dynamic Width */}
-                     <div className="relative pb-32" style={{ width: `${totalTrackWidth}px`, minWidth: '100%' }}>
+                     <div className="relative pb-32" style={{ width: `${totalContainerWidth}px`, minWidth: '100%' }}>
                          <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">{gridLines}</div>
                          <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}>
                              <div className="w-5 h-5 -ml-[9px] bg-cyan-400 transform rotate-45 -mt-2.5 shadow-md flex items-center justify-center border border-white">
@@ -546,7 +570,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
 
                          <div className="relative z-10 pt-2 space-y-1">
                             {tracks.map(track => (
-                                <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom}
+                                <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom} totalWidth={trackContentWidth}
                                     onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
                                     onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} 
                                     onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} 

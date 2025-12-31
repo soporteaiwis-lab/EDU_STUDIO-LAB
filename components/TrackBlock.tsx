@@ -8,6 +8,7 @@ interface TrackBlockProps {
   mode: UserMode;
   bpm: number;
   zoom: number; // Global Zoom
+  totalWidth?: number; // Total project width in pixels
   onVolumeChange: (id: string, val: number) => void;
   onPanChange?: (id: string, val: number) => void;
   onToggleMute: (id: string) => void;
@@ -18,7 +19,7 @@ interface TrackBlockProps {
   onEditMidi?: (id: string) => void; 
 }
 
-export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, onVolumeChange, onPanChange, onToggleMute, onToggleSolo, onToggleArm, onDelete, onSelect, onEditMidi }) => {
+export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, totalWidth, onVolumeChange, onPanChange, onToggleMute, onToggleSolo, onToggleArm, onDelete, onSelect, onEditMidi }) => {
   const [waveformPath, setWaveformPath] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +107,9 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
 
   const containerClass = mode === UserMode.EXPLORER ? "h-32 mb-4 rounded-2xl shadow-md border-4 border-white/30" : "bg-[#2a2a2a] border-b border-black h-28";
   
+  // Style to enforce width for scrolling
+  const widthStyle = totalWidth ? { width: `${totalWidth}px` } : { minWidth: '100%' };
+
   // Explorer Mode (BASIC)
   if (mode === UserMode.EXPLORER) {
       return (
@@ -147,7 +151,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                 <button onClick={(e) => { e.stopPropagation(); onDelete(track.id) }} className="absolute top-2 right-2 p-1.5 rounded-full bg-white/20 text-white hover:bg-red-500/80 transition-colors"><Trash2 size={16}/></button>
             </div>
             
-            <div className="flex-1 relative flex items-center bg-black/5 min-w-[800px]" ref={containerRef}>
+            <div className="flex-1 relative flex items-center bg-black/5" ref={containerRef} style={widthStyle}>
                 {track.type === 'MIDI' ? renderMidiContent() : renderAudioContent()}
             </div>
         </div>
@@ -209,7 +213,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                  )}
              </div>
          </div>
-         <div className="flex-1 relative overflow-hidden flex items-center min-w-[800px] bg-[#222]" ref={containerRef}>
+         <div className="flex-1 relative overflow-hidden flex items-center bg-[#222]" ref={containerRef} style={widthStyle}>
             {track.type === 'MIDI' ? renderMidiContent() : renderAudioContent()}
          </div>
       </div>
