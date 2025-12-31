@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Track, UserMode } from '../types';
-import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick,  Activity } from 'lucide-react';
+import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick,  Activity, Edit3 } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 interface TrackBlockProps {
@@ -13,9 +13,10 @@ interface TrackBlockProps {
   onToggleArm: (id: string) => void;
   onDelete: (id: string) => void;
   onSelect: (id: string) => void;
+  onEditMidi?: (id: string) => void; // New prop
 }
 
-export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeChange, onPanChange, onToggleMute, onToggleSolo, onToggleArm, onDelete, onSelect }) => {
+export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeChange, onPanChange, onToggleMute, onToggleSolo, onToggleArm, onDelete, onSelect, onEditMidi }) => {
   const [waveformPath, setWaveformPath] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -24,12 +25,14 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
        if (containerRef.current && (track.type === 'AUDIO' || track.type === 'SAMPLER')) {
           const width = containerRef.current.clientWidth;
           const height = mode === UserMode.EXPLORER ? 120 : 80; 
+          // Using a slight delay to ensure buffer load or retry logic could be added here
           const path = audioService.getWaveformPath(track.id, width, height);
           setWaveformPath(path);
        }
     };
-    const timer = setTimeout(generate, 200);
-    return () => clearTimeout(timer);
+    // Polling for waveform availability if recording just finished
+    const interval = setInterval(generate, 1000); 
+    return () => clearInterval(interval);
   }, [track.id, track.audioUrl, track.samplerUrl, mode, track.type]);
 
   const getIcon = () => {
@@ -56,7 +59,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
   const renderMidiContent = () => {
       const PIXELS_PER_SECOND = 40;
       return (
-          <div className="relative w-full h-full bg-[#181818] overflow-hidden">
+          <div className="relative w-full h-full bg-[#181818] overflow-hidden group" onDoubleClick={() => onEditMidi && onEditMidi(track.id)}>
               <div className="absolute inset-0 bg-[linear-gradient(to_right,#333_1px,transparent_1px),linear-gradient(to_bottom,#333_1px,transparent_1px)] bg-[size:40px_20px] opacity-20"></div>
               {track.midiNotes?.map((note, i) => (
                   <div key={i} className="absolute bg-cyan-500/80 border border-cyan-300 rounded-sm shadow-sm"
@@ -68,13 +71,26 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
                     }}
                   />
               ))}
+              {/* Overlay Button for Edit */}
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={(e) => {e.stopPropagation(); if(onEditMidi) onEditMidi(track.id)}} className="bg-cyan-600 text-white text-xs px-2 py-1 rounded shadow flex items-center hover:bg-cyan-500">
+                      <Edit3 size={12} className="mr-1"/> Editar MIDI
+                  </button>
+              </div>
           </div>
       );
   };
 
   const renderAudioContent = () => (
-     <div className={`relative h-full w-full flex items-center justify-center opacity-80 z-10 ${track.color.replace('bg-', 'bg-opacity-10 ')}`}>
-         {waveformPath && <svg height={80} width="100%" preserveAspectRatio="none" className="w-full h-full"><path d={waveformPath} fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" /></svg>}
+     <div className={`relative h-full w-full flex items-center justify-center opacity-90 z-10 ${track.color.replace('bg-', 'bg-opacity-20 ')}`}>
+         {/* High Contrast Waveform: Fill darker, Stroke lighter */}
+         {waveformPath && (
+             <svg height={80} width="100%" preserveAspectRatio="none" className="w-full h-full">
+                 <path d={waveformPath} fill="none" stroke="rgba(0,0,0,0.6)" strokeWidth="3" strokeLinecap="round" />
+                 <path d={waveformPath} fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1" strokeLinecap="round" />
+             </svg>
+         )}
+         {!waveformPath && track.audioUrl && <span className="text-xs opacity-50 animate-pulse">Cargando Onda...</span>}
      </div>
   );
 
@@ -84,11 +100,38 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
   if (mode === UserMode.EXPLORER) {
       return (
         <div className={`flex w-full ${containerClass} ${track.color} overflow-hidden relative shrink-0`}>
-             {/* ... (Kept Explorer Mode same for brevity) ... */}
             <div className={`w-72 ${stickyHeaderStyle} bg-black/10 backdrop-blur-sm flex flex-col items-center justify-center border-r-4 border-white/20 p-2 flex-shrink-0 relative`}>
+                
+                {/* Header Controls for Basic Mode */}
+                <div className="flex w-full items-center justify-between px-2 mb-2">
+                    <div className="bg-white/20 p-2 rounded-full">{getIcon()}</div>
+                    
+                    {/* RECORD BUTTON ADDED HERE */}
+                    {track.type !== 'CHORD' && (
+                        <button 
+                            onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
+                            className={`p-3 rounded-full border-4 shadow-sm transition-all ${track.isArmed ? 'bg-red-500 border-red-200 animate-pulse text-white' : 'bg-gray-200 border-gray-300 text-gray-400 hover:bg-gray-300'}`}
+                            title="GRABAR AQUÍ"
+                        >
+                            <CircleDot size={24} fill={track.isArmed ? "white" : "transparent"}/>
+                        </button>
+                    )}
+                </div>
+
                 <h3 className="font-fredoka text-lg font-bold text-white shadow-sm truncate w-full text-center mb-1">{track.name}</h3>
+                
+                {/* Simple Volume */}
+                <div className="w-full px-4">
+                    <input 
+                        type="range" min="0" max="100" value={track.volume} 
+                        onChange={(e) => onVolumeChange(track.id, parseInt(e.target.value))}
+                        className="w-full h-2 rounded-lg appearance-none bg-white/30 cursor-pointer"
+                    />
+                </div>
+
                 <button onClick={() => onDelete(track.id)} className="absolute top-2 right-2 p-1.5 rounded-full bg-white/20 text-white hover:bg-red-500/80 transition-colors"><Trash2 size={16}/></button>
             </div>
+            
             <div className="flex-1 relative flex items-center bg-black/5 min-w-[800px]" ref={containerRef}>
                 {track.type === 'MIDI' ? renderMidiContent() : renderAudioContent()}
             </div>
@@ -113,7 +156,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, onVolumeCha
              
              {/* Middle Row: Pan & Volume */}
              <div className="pl-2 flex items-center space-x-3 mb-1">
-                 {/* Pan Knob Simulation */}
+                 {/* Pan Knob */}
                  <div className="flex flex-col items-center">
                      <div className="w-6 h-6 rounded-full border border-gray-600 bg-[#222] relative flex items-center justify-center" title="Pan (L/R)">
                          <div className="w-0.5 h-2 bg-gray-400 absolute top-1 origin-bottom transition-transform" style={{ transform: `rotate(${track.pan * 1.8}deg)` }}></div>

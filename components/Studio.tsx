@@ -7,6 +7,7 @@ import { SongbookPanel } from './SongbookPanel';
 import { TimelineRuler } from './TimelineRuler';
 import { CreativeEditor } from './CreativeEditor';
 import { PianoPanel } from './PianoPanel';
+import { PianoRollEditor } from './PianoRollEditor';
 import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
 import { Track, UserMode, SongMetadata, MidiNote, AudioDevice } from '../types';
@@ -61,18 +62,21 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [showCreative, setShowCreative] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
+  const [editingMidiTrackId, setEditingMidiTrackId] = useState<string | null>(null);
+
   const [importModal, setImportModal] = useState(false); 
   const [pendingImport, setPendingImport] = useState<{url: string, name: string} | null>(null); 
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
 
   const [bpm, setBpm] = useState(120);
+  const [timeSignature, setTimeSignature] = useState<string>('4/4');
   
   const isPro = userMode === UserMode.PRO;
   const isExplorer = userMode === UserMode.EXPLORER;
 
-  // Detect selected track type for Piano Panel
   const selectedTrack = tracks.find(t => t.id === selectedTrackId);
-  const showPianoPanel = selectedTrack?.type === 'MIDI' || selectedTrack?.type === 'CHORD' || selectedTrack?.type === 'MELODY';
+  const editingTrack = tracks.find(t => t.id === editingMidiTrackId);
+  const showPianoPanel = (selectedTrack?.type === 'MIDI' || selectedTrack?.type === 'CHORD' || selectedTrack?.type === 'MELODY') && !editingMidiTrackId;
 
   // --- AUDIO INIT ---
   useEffect(() => {
@@ -83,7 +87,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         if(t.type === 'RHYTHM' || t.type === 'DRUMS') audioService.addTrack(t.id, '', 'DRUMS');
     });
 
-    // MIDI Recording Callback
     audioService.onMidiNoteRecorded = (trackId, note) => {
         setTracks(prev => prev.map(t => {
             if (t.id === trackId) {
@@ -100,6 +103,11 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   useEffect(() => { audioService.setBpm(bpm); setMetadata(prev => ({...prev, bpm})); }, [bpm]);
   useEffect(() => { audioService.toggleMetronome(metronomeOn); }, [metronomeOn]);
   
+  useEffect(() => {
+      const [num, den] = timeSignature.split('/').map(Number);
+      audioService.setTimeSignature(num, den);
+  }, [timeSignature]);
+
   useEffect(() => {
       const armed = tracks.find(t => t.isArmed && t.type === 'MIDI');
       if (armed) audioService.setActiveMidiTrack(armed.id);
@@ -129,6 +137,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const handleDeviceSelect = (deviceId: string) => {
       audioService.setAudioInputDevice(deviceId);
       setShowSettings(false);
+  };
+
+  const handleUpdateMidiNotes = (trackId: string, notes: MidiNote[]) => {
+      setTracks(prev => prev.map(t => t.id === trackId ? { ...t, midiNotes: notes } : t));
+      // Re-schedule for playback
+      audioService.scheduleMidi(trackId, notes);
   };
 
   const handlePlayToggle = async () => {
@@ -270,7 +284,16 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                  </div>
                  <div className="flex flex-col items-center z-10">
                      <span className="text-[10px] font-bold text-gray-500 mb-0.5">SIG</span>
-                     <div className="text-2xl font-mono font-bold text-cyan-400 leading-none">4/4</div>
+                     {/* Time Signature Selector */}
+                     <select 
+                        value={timeSignature}
+                        onChange={(e) => setTimeSignature(e.target.value)}
+                        className="bg-transparent text-xl font-mono font-bold text-cyan-400 leading-none appearance-none text-center focus:outline-none cursor-pointer"
+                     >
+                         <option value="4/4">4/4</option>
+                         <option value="3/4">3/4</option>
+                         <option value="6/8">6/8</option>
+                     </select>
                  </div>
                  <div className="flex flex-col items-center z-10">
                      <span className="text-[10px] font-bold text-gray-500 mb-0.5">CLICK</span>
@@ -310,7 +333,21 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                              <div className="w-3 h-3 -ml-1.5 bg-cyan-400 transform rotate-45 -mt-1.5"></div>
                          </div>
                          <div className="relative z-10 pt-1">
-                            {tracks.map(track => (<TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} />))}
+                            {tracks.map(track => (
+                                <TrackBlock 
+                                    key={track.id} 
+                                    track={{...track, isSelected: track.id === selectedTrackId}} 
+                                    mode={userMode} 
+                                    onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
+                                    onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} 
+                                    onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} 
+                                    onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} 
+                                    onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} 
+                                    onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} 
+                                    onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} 
+                                    onEditMidi={(id) => setEditingMidiTrackId(id)}
+                                />
+                            ))}
                          </div>
                          <div className="mt-4 p-4 flex justify-center w-fit" style={{ marginLeft: HEADER_WIDTH }}>
                              <button onClick={() => setImportModal(true)} className="bg-[#2a2a2a] text-gray-400 px-6 py-2 rounded-full text-sm font-bold flex items-center hover:bg-[#333] hover:text-white border border-gray-700 transition-all"><Plus size={16} className="mr-2"/> Añadir Pista</button>
@@ -321,8 +358,20 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 {/* MIXER */}
                 {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative animate-slide-up border-t border-black"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
                 
-                {/* NEW PIANO PANEL (Replaces Floating Keyboard) */}
+                {/* PIANO PANEL (Global Keyboard) */}
                 {showPianoPanel && <PianoPanel currentInstrument={selectedTrack.midiInstrument} onClose={() => setSelectedTrackId(null)} />}
+
+                {/* PIANO ROLL EDITOR (Detailed Editing) */}
+                {editingMidiTrackId && editingTrack && (
+                    <PianoRollEditor 
+                        trackId={editingTrack.id}
+                        trackName={editingTrack.name}
+                        notes={editingTrack.midiNotes || []}
+                        instrument={editingTrack.midiInstrument || 'GRAND_PIANO'}
+                        onUpdateNotes={handleUpdateMidiNotes}
+                        onClose={() => setEditingMidiTrackId(null)}
+                    />
+                )}
             </div>
 
             {/* Right Side Panels */}

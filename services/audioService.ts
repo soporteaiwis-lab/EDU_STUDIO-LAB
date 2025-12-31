@@ -94,9 +94,6 @@ class AudioService {
   async setAudioInputDevice(deviceId: string) {
       if (!this.mic) this.mic = new Tone.UserMedia();
       try {
-          // Tone.UserMedia.open can accept media stream constraints or device ID label
-          // However, Tone.js implementation varies. Safest is generic open and then specialized if supported,
-          // or passing the constraints object directly.
           if (this.mic.state === 'started') this.mic.close();
           await this.mic.open({ deviceId: { exact: deviceId } });
           console.log("Input device set to:", deviceId);
@@ -105,18 +102,16 @@ class AudioService {
       }
   }
 
-  // --- WEB MIDI API IMPLEMENTATION ---
+  // --- WEB MIDI API ---
   async initializeMidi() {
       if ((navigator as any).requestMIDIAccess) {
           try {
               this.midiAccess = await (navigator as any).requestMIDIAccess();
-              this.updateMidiStatus(); // Initial check
-              
+              this.updateMidiStatus(); 
               const inputs = this.midiAccess.inputs.values();
               for (let input of inputs) {
                   input.onmidimessage = this.handleMidiMessage.bind(this);
               }
-              
               this.midiAccess.onstatechange = (e: any) => {
                   console.log("MIDI Device Change:", e.port.state);
                   this.updateMidiStatus();
@@ -132,7 +127,6 @@ class AudioService {
       const inputs = Array.from(this.midiAccess.inputs.values());
       const isConnected = inputs.length > 0;
       const inputNames = inputs.map((i: any) => i.name);
-      
       if (this.onMidiStatusChange) {
           this.onMidiStatusChange(isConnected, inputNames);
       }
@@ -141,37 +135,20 @@ class AudioService {
   handleMidiMessage(message: any) {
       const [command, note, velocity] = message.data;
       const cmd = command >> 4;
-      
-      // Note On
       if (cmd === 9 && velocity > 0) {
           this.triggerMidiNoteOn(note, velocity / 127);
-      } 
-      // Note Off
-      else if (cmd === 8 || (cmd === 9 && velocity === 0)) {
+      } else if (cmd === 8 || (cmd === 9 && velocity === 0)) {
           this.triggerMidiNoteOff(note);
       }
   }
 
-  setActiveMidiTrack(trackId: string | null) {
-      this.activeMidiTrackId = trackId;
-  }
-
-  setMidiRecordingState(isRecording: boolean) {
-      this.isRecordingMidi = isRecording;
-      if (!isRecording) this.activeNotes.clear();
-  }
-  
-  setSustain(enabled: boolean) {
-      this.sustainEnabled = enabled;
-  }
+  setActiveMidiTrack(trackId: string | null) { this.activeMidiTrackId = trackId; }
+  setMidiRecordingState(isRecording: boolean) { this.isRecordingMidi = isRecording; if (!isRecording) this.activeNotes.clear(); }
+  setSustain(enabled: boolean) { this.sustainEnabled = enabled; }
 
   triggerMidiNoteOn(midiVal: number, velocity: number) {
       const noteName = Tone.Frequency(midiVal, "midi").toNote();
-      
-      // Visual feedback
       if (this.onMidiNoteActive) this.onMidiNoteActive(midiVal, velocity);
-
-      // Audio Trigger
       const now = Tone.now();
       if (this.activeMidiTrackId) {
           const ch = this.channels.get(this.activeMidiTrackId);
@@ -179,8 +156,6 @@ class AudioService {
       } else {
           this.previewSynth?.triggerAttack(noteName, now, velocity);
       }
-
-      // Recording Logic
       if (this.isRecordingMidi && this.activeMidiTrackId) {
           this.activeNotes.set(midiVal, { startTime: Tone.Transport.seconds, velocity: velocity });
       }
@@ -188,13 +163,8 @@ class AudioService {
 
   triggerMidiNoteOff(midiVal: number) {
       const noteName = Tone.Frequency(midiVal, "midi").toNote();
-      
-      // Visual feedback off
       if (this.onMidiNoteActive) this.onMidiNoteActive(midiVal, 0);
-
       const now = Tone.now();
-      
-      // Audio Release (Respect Sustain if implemented fully, here simple)
       if (!this.sustainEnabled) {
         if (this.activeMidiTrackId) {
             const ch = this.channels.get(this.activeMidiTrackId);
@@ -203,18 +173,14 @@ class AudioService {
             this.previewSynth?.triggerRelease(noteName, now);
         }
       } else {
-          // If sustain is on, we delay release (Simplified simulation)
           if (this.activeMidiTrackId) {
               const ch = this.channels.get(this.activeMidiTrackId);
-              if (ch && ch.synth) ch.synth.triggerRelease(noteName, now + 1); // 1s sustain tail
+              if (ch && ch.synth) ch.synth.triggerRelease(noteName, now + 1); 
           }
       }
-
-      // Recording Logic End
       if (this.isRecordingMidi && this.activeMidiTrackId && this.activeNotes.has(midiVal)) {
           const startData = this.activeNotes.get(midiVal)!;
           const duration = Tone.Transport.seconds - startData.startTime;
-          
           if (duration > 0.05) { 
               const midiNote: MidiNote = {
                   midi: midiVal, note: noteName,
@@ -226,32 +192,72 @@ class AudioService {
       }
   }
 
-  // --- TRACK & TRANSPORT ---
-  // ... (Existing methods kept mostly same, ensuring Pan/Volume work correctly)
-  
-  setVolume(id: string, value: number) { const ch = this.channels.get(id); if (ch) ch.node.volume.rampTo(value <= 0 ? -Infinity : Tone.gainToDb(value / 100), 0.1); }
-  
-  setPan(id: string, value: number) { 
-      // Input value is -50 to 50. Tone.Panner needs -1 to 1.
-      const normalized = value / 50; 
-      const ch = this.channels.get(id); 
-      if(ch) ch.panner.pan.rampTo(normalized, 0.1); 
+  // --- WAVEFORM ---
+  getWaveformPath(id: string, width: number, height: number): string {
+    const channel = this.channels.get(id);
+    const player = channel?.player || channel?.sampler;
+    // Check loaded state specifically for Tone.Player
+    if (!channel || !player || !(player as any).loaded) return "";
+    try {
+        const buffer = player.buffer;
+        const data = buffer.getChannelData(0); 
+        const step = Math.ceil(data.length / width);
+        const amp = height / 2;
+        let path = `M 0 ${amp} `;
+        for (let i = 0; i < width; i++) {
+          let min = 1.0; let max = -1.0;
+          for (let j = 0; j < step; j++) {
+            const datum = data[(i * step) + j];
+            if (datum < min) min = datum;
+            if (datum > max) max = datum;
+          }
+          // Simple clamping
+          if(min < -1) min = -1; if(max > 1) max = 1;
+          
+          path += `L ${i} ${(1 + min) * amp} `;
+          path += `L ${i} ${(1 + max) * amp} `;
+        }
+        return path;
+    } catch (e) { return ""; }
   }
 
-  // Boilerplate Methods
+  // --- TRANSPORT ---
+  setVolume(id: string, value: number) { const ch = this.channels.get(id); if (ch) ch.node.volume.rampTo(value <= 0 ? -Infinity : Tone.gainToDb(value / 100), 0.1); }
+  setPan(id: string, value: number) { const normalized = value / 50; const ch = this.channels.get(id); if(ch) ch.panner.pan.rampTo(normalized, 0.1); }
   setBpm(bpm: number) { this.bpm = bpm; Tone.Transport.bpm.value = bpm; }
-  toggleMetronome(enabled: boolean) {
-      if (enabled) {
-          if (this.metronomeLoop) { this.metronomeLoop.stop(); this.metronomeLoop.dispose(); }
-          this.metronomeLoop = new Tone.Loop((time) => {
-              const position = Tone.Transport.position.toString().split(':');
-              const quarter = parseInt(position[1]); 
-              if (quarter === 0) { this.metronomeClick?.triggerAttackRelease("C6", "32n", time); } 
-              else { this.metronomeSynth?.triggerAttackRelease("C5", "32n", time); }
-          }, "4n"); 
-          this.metronomeLoop.start(0);
-      } else { this.metronomeLoop?.stop(); }
+  
+  setTimeSignature(numerator: number, denominator: number) {
+      this.timeSignature = [numerator, denominator];
+      Tone.Transport.timeSignature = [numerator, denominator];
+      // Restart metronome if running to apply changes
+      if(this.metronomeLoop && this.metronomeLoop.state === 'started') {
+          this.toggleMetronome(true);
+      }
   }
+
+  toggleMetronome(enabled: boolean) {
+      if (this.metronomeLoop) { this.metronomeLoop.stop(); this.metronomeLoop.dispose(); }
+      
+      if (enabled) {
+          const numerator = this.timeSignature[0];
+          // Determine loop interval based on time signature. Usually '4n' (quarter note) is standard beat.
+          // For 6/8, beats are dotted quarters or eighths depending on feel, sticking to quarters for simplicity or '8n' if denominator is 8.
+          const subdivision = this.timeSignature[1] === 8 ? '8n' : '4n';
+
+          let counter = 0;
+          this.metronomeLoop = new Tone.Loop((time) => {
+              // Standard accent on first beat
+              if (counter % numerator === 0) {
+                  this.metronomeClick?.triggerAttackRelease("C6", "32n", time);
+              } else {
+                  this.metronomeSynth?.triggerAttackRelease("C5", "32n", time);
+              }
+              counter++;
+          }, subdivision); 
+          this.metronomeLoop.start(0);
+      }
+  }
+
   rewind(seconds: number) { this.setTime(Math.max(0, Tone.Transport.seconds - seconds)); }
   seekToStart() { this.setTime(0); }
   setTime(seconds: number) { Tone.Transport.seconds = seconds; this.currentBeat = Math.floor(seconds / (60/this.bpm)); }
@@ -268,7 +274,7 @@ class AudioService {
     const pitchShift = new Tone.PitchShift({ pitch: 0 });
     const channel = new Tone.Channel({ volume: 0, pan: 0 }).toDestination();
     const buildChain = (node: Tone.AudioNode) => { node.chain(pitchShift, eq, panner, volume, reverb, channel); };
-    // Implementation of types...
+    
     if (type === 'INSTRUMENT') {
         const synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.1, release: 0.3 }, maxPolyphony: 32 });
         buildChain(synth);
@@ -278,12 +284,24 @@ class AudioService {
         buildChain(players);
         this.channels.set(id, { drumSampler: players, eq, panner, volume, reverb, pitchShift, node: channel, type: 'DRUMS' });
     } else if (type === 'SAMPLER') {
-        const player = new Tone.Player(urlOrType).toDestination();
+        const player = new Tone.Player({
+            url: urlOrType,
+            loop: false,
+            autostart: false,
+            onload: () => console.log(`Sampler loaded for ${id}`)
+        }).toDestination();
         buildChain(player);
         this.channels.set(id, { sampler: player, eq, panner, volume, reverb, pitchShift, node: channel, type: 'SAMPLER' });
     } else {
-        const player = new Tone.Player(urlOrType).toDestination();
-        player.sync().start(0);
+        const player = new Tone.Player({
+            url: urlOrType,
+            loop: false,
+            autostart: false,
+            onload: () => {
+                player.sync().start(0);
+                console.log(`Audio loaded for ${id}`);
+            }
+        }).toDestination();
         buildChain(player);
         this.channels.set(id, { player, eq, panner, volume, reverb, pitchShift, node: channel, type: 'AUDIO' });
     }
@@ -317,7 +335,7 @@ class AudioService {
   scheduleChords(trackId: string, chords: ChordEvent[]) {}
   scheduleDrums(trackId: string, events: DrumEvent[]) {}
   scheduleMelody(trackId: string, events: MelodyEvent[]) {}
-  getWaveformPath(id: string, width: number, height: number): string { return ""; }
+  
   play() { if (Tone.context.state !== 'running') Tone.context.resume(); Tone.Transport.start(); }
   pause() { Tone.Transport.pause(); }
   stop() { Tone.Transport.stop(); Tone.Transport.seconds = 0; this.currentBeat = 0; this.activeNotes.clear(); }
@@ -328,7 +346,6 @@ class AudioService {
   toggleMute(id: string, m: boolean) { const c=this.channels.get(id); if(c) c.node.mute=m; }
   toggleSolo(id: string, s: boolean) { const c=this.channels.get(id); if(c) c.node.solo=s; }
   
-  // Method needed for presets
   updateInstrumentPreset(trackId: string, instrument: MidiInstrumentName) {
       const ch = this.channels.get(trackId);
       if (!ch || !ch.synth) return;
