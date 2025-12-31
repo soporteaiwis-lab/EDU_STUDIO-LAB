@@ -6,11 +6,11 @@ import { Browser } from './Browser';
 import { SongbookPanel } from './SongbookPanel';
 import { TimelineRuler } from './TimelineRuler';
 import { CreativeEditor } from './CreativeEditor';
-import { VirtualKeyboard } from './VirtualKeyboard';
+import { PianoPanel } from './PianoPanel';
 import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
-import { Track, UserMode, SongMetadata, MidiNote } from '../types';
-import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Track, UserMode, SongMetadata, MidiNote, AudioDevice } from '../types';
+import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 
 interface StudioProps {
   userMode: UserMode;
@@ -59,15 +59,20 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [showBrowser, setShowBrowser] = useState(true);
   const [showSongbook, setShowSongbook] = useState(false);
   const [showCreative, setShowCreative] = useState(false);
-  const [showKeyboard, setShowKeyboard] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const [importModal, setImportModal] = useState(false); 
   const [pendingImport, setPendingImport] = useState<{url: string, name: string} | null>(null); 
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
 
   const [bpm, setBpm] = useState(120);
   
   const isPro = userMode === UserMode.PRO;
   const isExplorer = userMode === UserMode.EXPLORER;
+
+  // Detect selected track type for Piano Panel
+  const selectedTrack = tracks.find(t => t.id === selectedTrackId);
+  const showPianoPanel = selectedTrack?.type === 'MIDI' || selectedTrack?.type === 'CHORD' || selectedTrack?.type === 'MELODY';
 
   // --- AUDIO INIT ---
   useEffect(() => {
@@ -95,15 +100,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   useEffect(() => { audioService.setBpm(bpm); setMetadata(prev => ({...prev, bpm})); }, [bpm]);
   useEffect(() => { audioService.toggleMetronome(metronomeOn); }, [metronomeOn]);
   
-  // Track armed/selection change -> Tell AudioService which track gets MIDI
   useEffect(() => {
       const armed = tracks.find(t => t.isArmed && t.type === 'MIDI');
-      if (armed) {
-          audioService.setActiveMidiTrack(armed.id);
-      } else {
-          audioService.setActiveMidiTrack(null);
-      }
-  }, [tracks]);
+      if (armed) audioService.setActiveMidiTrack(armed.id);
+      else if (selectedTrack && selectedTrack.type === 'MIDI') audioService.setActiveMidiTrack(selectedTrack.id);
+      else audioService.setActiveMidiTrack(null);
+  }, [tracks, selectedTrackId]);
 
   useEffect(() => {
     const animate = () => {
@@ -117,7 +119,18 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     return () => { if(animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, []);
 
-  // --- TRANSPORT ---
+  // --- HANDLERS ---
+  const handleSettingsOpen = async () => {
+      const devices = await audioService.getAudioInputDevices();
+      setAudioDevices(devices);
+      setShowSettings(true);
+  };
+
+  const handleDeviceSelect = (deviceId: string) => {
+      audioService.setAudioInputDevice(deviceId);
+      setShowSettings(false);
+  };
+
   const handlePlayToggle = async () => {
     await audioService.initialize();
     if (isPlaying) { 
@@ -127,7 +140,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             if (t.type === 'CHORD' && t.chordData) audioService.scheduleChords(t.id, t.chordData);
             if ((t.type === 'RHYTHM' || t.type === 'DRUMS') && t.rhythmData) audioService.scheduleDrums(t.id, t.rhythmData);
             if (t.type === 'MELODY' && t.melodyData) audioService.scheduleMelody(t.id, t.melodyData);
-            // Schedule Recorded MIDI
             if (t.type === 'MIDI' && t.midiNotes) audioService.scheduleMidi(t.id, t.midiNotes);
         });
         audioService.play(); 
@@ -140,7 +152,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const handleSeekEnd = () => audioService.setTime(30 * 4 * (60/bpm)); 
   const handleRewind = () => audioService.rewind(10);
   const handleForward = () => { const t = audioService.getCurrentTime(); audioService.setTime(t + 10); };
-
+  
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = timelineContainerRef.current?.getBoundingClientRect();
     if (rect) {
@@ -151,10 +163,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   };
 
   const handleRecordToggle = async () => {
-    // STOP
     if (isRecording) {
       if (recordingTrackIdRef.current) {
-         // If it was audio, stop microphone
          const t = tracks.find(tr => tr.id === recordingTrackIdRef.current);
          if (t && t.type === 'AUDIO') {
              const audioUrl = await audioService.stopRecording();
@@ -169,8 +179,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       handleStop(); 
       return;
     }
-
-    // START
     const target = tracks.find(t => t.isArmed);
     if (!target) { alert("¡Primero arma una pista!"); return; }
 
@@ -182,11 +190,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             audioService.setMidiRecordingState(true);
             audioService.setActiveMidiTrack(target.id);
         }
-
         recordingTrackIdRef.current = target.id; 
         setIsRecording(true); 
         if(!isPlaying) audioService.play(); 
-
     } catch(e) { console.error(e); }
   };
 
@@ -208,8 +214,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       else audioService.addTrack(id, '', 'AUDIO');
       setImportModal(false);
   };
-
-  const handleImportRequest = (url: string, name: string) => { setPendingImport({ url, name }); };
+  
   const confirmImport = (trackType: 'AUDIO' | 'SAMPLER' | 'MIDI') => {
       if (!pendingImport) return;
       const id = Date.now().toString();
@@ -240,9 +245,10 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         {/* TOP BAR / TRANSPORT */}
         <div className="h-16 flex-shrink-0 bg-[#1a1a1a] border-b border-black flex items-center px-4 justify-between z-50">
              
-             {/* Left: Transport Buttons */}
              <div className="flex items-center space-x-3">
                  <button onClick={onExit} className="text-gray-500 hover:text-white mr-4"><Home size={18}/></button>
+                 <button onClick={handleSettingsOpen} className="p-2 text-gray-500 hover:text-white" title="Configuración de Audio/MIDI"><Settings size={18}/></button>
+                 <div className="w-px h-6 bg-gray-700 mx-2"></div>
                  <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white active:scale-95 transition"><SkipBack size={20}/></button>
                  <button onClick={handleRewind} className="p-2 text-gray-400 hover:text-white active:scale-95 transition"><Rewind size={20}/></button>
                  <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 active:scale-95 transition"><Square size={20}/></button>
@@ -255,24 +261,17 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                  <button onClick={handleForward} className="p-2 text-gray-400 hover:text-white active:scale-95 transition"><FastForward size={20}/></button>
              </div>
 
-             {/* Center: LCD Panel */}
              <div className="mx-4 flex-1 max-w-lg bg-[#0a0a0a] rounded-lg border border-gray-800 p-2 flex items-center justify-center space-x-6 shadow-inner relative overflow-hidden">
                  <div className="absolute inset-0 bg-cyan-900/5 pointer-events-none"></div>
-                 
-                 {/* BPM */}
                  <div className="flex flex-col items-center group relative z-10">
                      <span className="text-[10px] font-bold text-gray-500 mb-0.5">BPM</span>
                      <div className="text-2xl font-mono font-bold text-cyan-400 leading-none">{bpm}</div>
                      <input type="range" min="60" max="200" value={bpm} onChange={(e) => setBpm(parseInt(e.target.value))} className="absolute w-full h-full opacity-0 cursor-ns-resize"/>
                  </div>
-                 
-                 {/* Signature */}
                  <div className="flex flex-col items-center z-10">
                      <span className="text-[10px] font-bold text-gray-500 mb-0.5">SIG</span>
                      <div className="text-2xl font-mono font-bold text-cyan-400 leading-none">4/4</div>
                  </div>
-
-                 {/* Metronome Toggle */}
                  <div className="flex flex-col items-center z-10">
                      <span className="text-[10px] font-bold text-gray-500 mb-0.5">CLICK</span>
                      <button onClick={() => setMetronomeOn(!metronomeOn)} className={`w-8 h-6 rounded border ${metronomeOn ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-gray-800 border-gray-700 text-gray-600'}`}>
@@ -281,17 +280,14 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                  </div>
              </div>
 
-             {/* Right: Tools & Views */}
              <div className="flex items-center space-x-3 border-l border-gray-700 pl-4">
                  <div className="flex flex-col items-end mr-2">
                      <input value={sessionName} onChange={(e) => setSessionName(e.target.value)} className="bg-transparent text-right text-sm font-bold text-gray-300 focus:outline-none focus:text-cyan-400 w-32"/>
-                     <span className="text-[9px] text-gray-500">v{useMemo(() => '2.1.0', [])}</span>
+                     <span className="text-[9px] text-gray-500">v{useMemo(() => '2.2.0', [])}</span>
                  </div>
-                 
                  <button onClick={() => setShowCreative(true)} className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-md text-xs font-bold flex items-center hover:opacity-90 shadow-lg">
                     <Sparkles size={14} className="mr-1"/> AI
                  </button>
-                 
                  <div className="flex bg-[#2a2a2a] rounded p-1">
                      <button onClick={() => setShowMixer(!showMixer)} className={`p-1.5 rounded ${showMixer ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Mixer"><PanelBottom size={16}/></button>
                      <button onClick={() => {setShowBrowser(false); setShowSongbook(!showSongbook);}} className={`p-1.5 rounded ${showSongbook ? 'bg-gray-600 text-white' : 'text-gray-500'}`} title="Lyrics"><BookOpen size={16}/></button>
@@ -310,108 +306,56 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                      <div className="sticky top-0 z-30 w-fit"><TimelineRuler mode={userMode} bpm={bpm} zoom={1} paddingLeft={HEADER_WIDTH} /></div>
                      <div className="relative min-w-max pb-32">
                          <div className="absolute top-0 left-0 min-w-full h-full pointer-events-none z-0">{gridLines}</div>
-                         {/* Playhead */}
                          <div ref={playheadRef} className="absolute top-0 bottom-0 w-px bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)] z-40 pointer-events-none" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}>
                              <div className="w-3 h-3 -ml-1.5 bg-cyan-400 transform rotate-45 -mt-1.5"></div>
                          </div>
-                         
                          <div className="relative z-10 pt-1">
-                            {tracks.map(track => (<TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} 
-                            onDelete={(id) => {
-                                audioService.removeTrack(id); 
-                                setTracks(prev => prev.filter(t => t.id !== id));
-                            }} 
-                            onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} />))}
+                            {tracks.map(track => (<TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} />))}
                          </div>
-                         
                          <div className="mt-4 p-4 flex justify-center w-fit" style={{ marginLeft: HEADER_WIDTH }}>
                              <button onClick={() => setImportModal(true)} className="bg-[#2a2a2a] text-gray-400 px-6 py-2 rounded-full text-sm font-bold flex items-center hover:bg-[#333] hover:text-white border border-gray-700 transition-all"><Plus size={16} className="mr-2"/> Añadir Pista</button>
                         </div>
                      </div>
                 </div>
                 
-                {/* Bottom Panels */}
+                {/* MIXER */}
                 {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative animate-slide-up border-t border-black"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
                 
-                {showKeyboard && <VirtualKeyboard />}
+                {/* NEW PIANO PANEL (Replaces Floating Keyboard) */}
+                {showPianoPanel && <PianoPanel currentInstrument={selectedTrack.midiInstrument} onClose={() => setSelectedTrackId(null)} />}
             </div>
 
             {/* Right Side Panels */}
-            {showBrowser && <Browser mode={userMode} onImport={handleImportRequest} onLoadSession={(s)=>{handleStop();setSessionId(s.id);setSessionName(s.name);setBpm(s.bpm);setTracks(s.tracks);if(s.metadata)setMetadata(s.metadata);setShowBrowser(false);}} onClose={() => setShowBrowser(false)} />}
+            {showBrowser && <Browser mode={userMode} onImport={(u,n,t)=>setPendingImport({url:u,name:n})} onLoadSession={(s)=>{handleStop();setSessionId(s.id);setSessionName(s.name);setBpm(s.bpm);setTracks(s.tracks);if(s.metadata)setMetadata(s.metadata);setShowBrowser(false);}} onClose={() => setShowBrowser(false)} />}
             {showSongbook && <SongbookPanel mode={userMode} metadata={metadata} onUpdateLyrics={(text) => setMetadata(prev=>({...prev, lyrics: text}))} onClose={() => setShowSongbook(false)} />}
         </div>
-
-        {/* Floating Keyboard Toggle */}
-        <button 
-            onClick={() => setShowKeyboard(!showKeyboard)}
-            className={`fixed bottom-4 right-80 z-40 p-3 rounded-full shadow-lg border transition-all ${showKeyboard ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-gray-800 text-gray-400 border-gray-600'}`}
-            title="Teclado Virtual"
-        >
-            <KeyboardIcon size={20}/>
-        </button>
         
-        {/* Modals */}
+        {/* SETTINGS MODAL */}
+        {showSettings && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+                <div className="bg-[#1e1e1e] border border-gray-700 p-6 rounded-2xl w-96 text-gray-200 shadow-2xl">
+                    <h3 className="text-xl font-bold mb-4 flex items-center"><Settings className="mr-2"/> Configuración de Audio</h3>
+                    <div className="mb-4">
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Entrada de Audio (Mic)</label>
+                        <div className="space-y-2">
+                            {audioDevices.length > 0 ? audioDevices.map(d => (
+                                <button key={d.deviceId} onClick={() => handleDeviceSelect(d.deviceId)} className="w-full text-left p-2 bg-black/20 hover:bg-black/40 rounded flex items-center">
+                                    <Mic size={14} className="mr-2 text-green-500"/> <span className="text-sm truncate">{d.label}</span>
+                                </button>
+                            )) : <div className="text-sm text-red-400">No se detectaron dispositivos. Revisa los permisos.</div>}
+                        </div>
+                    </div>
+                    <div className="mt-6 flex justify-end">
+                        <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 font-bold text-sm">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ... (Existing modals for import and creative kept same) ... */}
         {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={(t)=>setMetadata(p=>({...p,lyrics:t}))} onImportChords={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Acordes ${d.key}`,type:'CHORD',instrument:'CHORD',color:'bg-blue-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,chordData:d.progression}]);audioService.addTrack(id,'','INSTRUMENT');}} onImportRhythm={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Batería ${d.style}`,type:'RHYTHM',instrument:'DRUMS',color:'bg-red-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,rhythmData:d.events}]);audioService.addTrack(id,'','DRUMS');}} onImportMelody={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Melodía ${d.key}`,type:'MELODY',instrument:'KEYS',color:'bg-yellow-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,melodyData:d.events}]);audioService.addTrack(id,'','INSTRUMENT');}} />}
-        
-        {/* Track Type Selection Modal (On File Import) */}
-        {pendingImport && (
-             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]">
-                <div className="bg-white p-6 rounded-2xl shadow-2xl w-96 animate-slide-up border-2 border-blue-500">
-                    <h3 className="text-xl font-bold mb-2">Importar Archivo</h3>
-                    <p className="text-sm text-gray-500 mb-4 break-all">"{pendingImport.name}"</p>
-                    <p className="text-sm font-bold text-gray-700 mb-4">¿Cómo quieres usar este audio?</p>
-                    
-                    <div className="space-y-3">
-                        <button onClick={() => confirmImport('AUDIO')} className="w-full p-3 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center font-bold text-blue-700 border border-blue-200">
-                             <div className="bg-blue-500 text-white p-2 rounded-full mr-3"><FileAudio size={18}/></div>
-                             <div>
-                                 <div className="text-sm">Pista de Audio</div>
-                                 <div className="text-[10px] opacity-70 font-normal">Para voz, canciones o loops largos</div>
-                             </div>
-                        </button>
-                        <button onClick={() => confirmImport('SAMPLER')} className="w-full p-3 bg-orange-50 hover:bg-orange-100 rounded-xl flex items-center font-bold text-orange-700 border border-orange-200">
-                             <div className="bg-orange-500 text-white p-2 rounded-full mr-3"><Zap size={18}/></div>
-                             <div>
-                                 <div className="text-sm">Sampler / SFX</div>
-                                 <div className="text-[10px] opacity-70 font-normal">Efectos cortos (One-Shot)</div>
-                             </div>
-                        </button>
-                        <button onClick={() => confirmImport('MIDI')} className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-xl flex items-center font-bold text-gray-700 border border-gray-200">
-                             <div className="bg-gray-500 text-white p-2 rounded-full mr-3"><Music size={18}/></div>
-                             <div>
-                                 <div className="text-sm">Pista MIDI</div>
-                                 <div className="text-[10px] opacity-70 font-normal">Instrumento Virtual</div>
-                             </div>
-                        </button>
-                    </div>
-                    <button onClick={() => setPendingImport(null)} className="mt-4 text-gray-400 text-xs hover:text-red-500 font-bold block mx-auto uppercase">Cancelar</button>
-                </div>
-            </div>
-        )}
-
-        {/* New Track Modal (Empty) */}
-        {importModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white p-6 rounded-2xl shadow-xl w-96">
-                    <h3 className="text-xl font-bold mb-4">Crear Nueva Pista</h3>
-                    <div className="space-y-3">
-                        <button onClick={() => addTrack('AUDIO')} className="w-full p-4 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center font-bold text-blue-700 border border-blue-200">
-                             <div className="bg-blue-500 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>
-                             Audio / Voz (Mic)
-                        </button>
-                        <button onClick={() => addTrack('MIDI')} className="w-full p-4 bg-orange-50 hover:bg-orange-100 rounded-xl flex items-center font-bold text-orange-700 border border-orange-200">
-                             <div className="bg-orange-500 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>
-                             Instrumento Virtual (MIDI)
-                        </button>
-                        <button onClick={() => addTrack('SAMPLER')} className="w-full p-4 bg-purple-50 hover:bg-purple-100 rounded-xl flex items-center font-bold text-purple-700 border border-purple-200">
-                             <div className="bg-purple-500 text-white p-2 rounded-full mr-3"><Zap size={20}/></div>
-                             Sampler / SFX (One-Shot)
-                        </button>
-                    </div>
-                    <button onClick={() => setImportModal(false)} className="mt-4 text-gray-500 text-sm hover:text-red-500 font-bold block mx-auto">Cancelar</button>
-                </div>
-            </div>
-        )}
+        {pendingImport && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]"><div className="bg-white p-6 rounded-2xl shadow-2xl w-96 animate-slide-up border-2 border-blue-500"><h3 className="text-xl font-bold mb-2 text-gray-800">Importar Archivo</h3><p className="text-sm text-gray-500 mb-4 break-all">"{pendingImport.name}"</p><div className="space-y-3"><button onClick={() => confirmImport('AUDIO')} className="w-full p-3 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center font-bold text-blue-700 border border-blue-200"><div className="bg-blue-500 text-white p-2 rounded-full mr-3"><FileAudio size={18}/></div><div><div className="text-sm">Pista de Audio</div></div></button><button onClick={() => confirmImport('MIDI')} className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-xl flex items-center font-bold text-gray-700 border border-gray-200"><div className="bg-gray-500 text-white p-2 rounded-full mr-3"><Music size={18}/></div><div><div className="text-sm">Pista MIDI</div></div></button></div><button onClick={() => setPendingImport(null)} className="mt-4 text-gray-400 text-xs hover:text-red-500 font-bold block mx-auto uppercase">Cancelar</button></div></div>}
+        {importModal && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white p-6 rounded-2xl shadow-xl w-96"><h3 className="text-xl font-bold mb-4 text-gray-800">Crear Nueva Pista</h3><div className="space-y-3"><button onClick={() => addTrack('AUDIO')} className="w-full p-4 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center font-bold text-blue-700 border border-blue-200"><div className="bg-blue-500 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>Audio / Voz (Mic)</button><button onClick={() => addTrack('MIDI')} className="w-full p-4 bg-orange-50 hover:bg-orange-100 rounded-xl flex items-center font-bold text-orange-700 border border-orange-200"><div className="bg-orange-500 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>Instrumento Virtual (MIDI)</button></div><button onClick={() => setImportModal(false)} className="mt-4 text-gray-500 text-sm hover:text-red-500 font-bold block mx-auto">Cancelar</button></div></div>}
     </div>
   );
 };

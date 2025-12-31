@@ -11,11 +11,17 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '2.1.0 BETA (MIDI)',
+  version: '2.2.0 MIDI-PRO',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
 };
+
+export interface AudioDevice {
+  deviceId: string;
+  label: string;
+  kind: MediaDeviceKind;
+}
 
 export interface ProjectState {
   bpm: number;
@@ -57,7 +63,6 @@ export interface MelodyEvent {
   time: string;
 }
 
-// New MIDI Note Structure for recording
 export interface MidiNote {
   note: string;      // e.g. "C4"
   midi: number;      // e.g. 60
@@ -71,10 +76,10 @@ export interface Track {
   name: string;
   type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD' | 'RHYTHM' | 'MELODY' | 'DRUMS' | 'SAMPLER';
   instrument: InstrumentType;
-  midiInstrument?: MidiInstrumentName; // The selected sound preset
+  midiInstrument?: MidiInstrumentName;
   color: string;
   volume: number; // 0-100
-  pan: number; // -50 to 50
+  pan: number; // -50 to 50 (Left to Right)
   eq: TrackEQ;
   effects: TrackEffects; 
   isMuted: boolean;
@@ -86,7 +91,7 @@ export interface Track {
   chordData?: ChordEvent[]; 
   rhythmData?: DrumEvent[];
   melodyData?: MelodyEvent[];
-  midiNotes?: MidiNote[]; // Recorded MIDI data
+  midiNotes?: MidiNote[]; 
 }
 
 export interface SongMetadata {
@@ -108,13 +113,6 @@ export interface SFXSuggestion {
   textContext: string;
   soundDescription: string;
   timeOffset?: number;
-}
-
-export interface MetronomeConfig {
-  enabled: boolean;
-  bpm: number;
-  timeSignature: [number, number];
-  volume: number;
 }
 
 export interface Session {
