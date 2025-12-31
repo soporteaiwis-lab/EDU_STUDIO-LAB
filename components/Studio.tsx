@@ -12,10 +12,11 @@ import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
 import { getProducerAdvice, ProducerAdvice } from '../services/geminiService';
 import { Track, UserMode, SongMetadata, MidiNote, AudioDevice, LoopRegion } from '../types';
-import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown, Library, Layers, Box, Maximize, Bot } from 'lucide-react';
+import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown, Library, Layers, Box, Maximize, Bot, Baby, Hammer, Zap as ZapIcon } from 'lucide-react';
 
 interface StudioProps {
   userMode: UserMode;
+  onModeChange: (mode: UserMode) => void;
   onExit: () => void;
 }
 
@@ -39,7 +40,7 @@ const INITIAL_METADATA: SongMetadata = {
 
 const HEADER_WIDTH = 260; 
 
-export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
+export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }) => {
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
   const [metadata, setMetadata] = useState<SongMetadata>(INITIAL_METADATA);
   
@@ -383,30 +384,65 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       setShowProducer(false);
   }
 
+  // --- MODE SWITCHER COMPONENT ---
+  const ModeSwitcher = () => (
+      <div className="flex items-center space-x-1 bg-black/40 rounded-lg p-1 border border-white/10 mx-4">
+          <button 
+            onClick={() => onModeChange(UserMode.EXPLORER)}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all ${userMode === UserMode.EXPLORER ? 'bg-cyan-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            title="Modo Explorador (Básico)"
+          >
+             <Baby size={14}/>
+             <span className="text-xs font-bold hidden xl:inline">Explorador</span>
+          </button>
+          <button 
+            onClick={() => onModeChange(UserMode.MAKER)}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all ${userMode === UserMode.MAKER ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            title="Modo Creador (Intermedio)"
+          >
+             <Hammer size={14}/>
+             <span className="text-xs font-bold hidden xl:inline">Creador</span>
+          </button>
+          <button 
+            onClick={() => onModeChange(UserMode.PRO)}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all ${userMode === UserMode.PRO ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            title="Modo Pro (Avanzado)"
+          >
+             <ZapIcon size={14}/>
+             <span className="text-xs font-bold hidden xl:inline">Pro</span>
+          </button>
+      </div>
+  );
+
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0a0a] font-nunito select-none overflow-hidden text-gray-200 relative">
         
         {/* TOP BAR / TRANSPORT */}
         <div className="h-16 flex-shrink-0 bg-[#0f0f13] border-b border-white/5 flex items-center px-4 justify-between z-50 shadow-md">
              
-             {/* Left: LOGO & EXIT */}
-             <div className="flex items-center space-x-4">
-                 <button onClick={onExit} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors"><Home size={20}/></button>
+             {/* Left: LOGO & EXIT & MODE SWITCHER */}
+             <div className="flex items-center">
+                 <button onClick={onExit} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors mr-2"><Home size={20}/></button>
                  
-                 <div className="flex items-center gap-3 select-none">
+                 <div className="flex items-center gap-3 select-none mr-4">
                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-900/40">
                         <Box size={18} className="text-white"/>
                      </div>
-                     <div className="flex flex-col leading-none">
+                     <div className="flex flex-col leading-none hidden md:flex">
                          <span className="font-brand font-black text-lg tracking-tight text-white">EDU<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">STUDIO</span></span>
                          <span className="text-[9px] font-bold text-gray-500 tracking-[0.2em] uppercase">Creative Lab</span>
                      </div>
                  </div>
 
-                 <div className="w-px h-8 bg-white/5 mx-4"></div>
+                 <div className="w-px h-8 bg-white/5 mx-2 hidden md:block"></div>
+                 
+                 {/* RESTORED MODE SWITCHER */}
+                 <ModeSwitcher />
+
+                 <div className="w-px h-8 bg-white/5 mx-2 hidden md:block"></div>
 
                  {/* TRANSPORT CONTROLS */}
-                 <div className="flex items-center bg-black/40 rounded-full p-1.5 border border-white/5 shadow-inner">
+                 <div className="flex items-center bg-black/40 rounded-full p-1.5 border border-white/5 shadow-inner ml-2">
                      <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Ir al Inicio"><SkipBack size={16}/></button>
                      <button onClick={handleRewind} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Retroceder 10s"><Rewind size={16}/></button>
                      <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-full transition" title="Detener"><Square size={16}/></button>
@@ -425,7 +461,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
              </div>
 
              {/* Center Display (LCD) */}
-             <div className="relative mx-4 flex-1 max-w-[400px]" ref={metronomeRef}>
+             <div className="relative mx-4 flex-1 max-w-[400px] hidden lg:block" ref={metronomeRef}>
                  <div className="bg-[#050505] rounded-xl border border-white/10 p-1 flex items-center justify-between shadow-inner h-14 px-6 relative">
                      <div className="flex flex-col items-center border-r border-white/5 pr-6 cursor-pointer hover:bg-white/5 h-full justify-center transition rounded-l-lg" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
                          <span className="text-[9px] font-bold text-gray-500 tracking-wider">BPM</span>

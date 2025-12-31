@@ -36,8 +36,11 @@ export default function App() {
 
   const handleLogin = (selectedRole: UserRole) => {
     setRole(selectedRole);
+    // Default modes based on role, but can be changed in Studio
     if (selectedRole === UserRole.TEACHER) {
         setMode(UserMode.PRO);
+    } else {
+        setMode(UserMode.EXPLORER);
     }
     setCurrentPage('DASHBOARD');
   };
@@ -171,7 +174,7 @@ export default function App() {
           {/* STUDIO VIEW */}
           {currentPage === 'STUDIO' && (
              <div className="absolute inset-0 bg-black">
-                <Studio userMode={mode} onExit={() => setCurrentPage('DASHBOARD')} />
+                <Studio userMode={mode} onModeChange={setMode} onExit={() => setCurrentPage('DASHBOARD')} />
              </div>
           )}
       </main>
