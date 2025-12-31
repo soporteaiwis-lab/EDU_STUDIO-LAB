@@ -1,8 +1,8 @@
 import React from 'react';
-import { Track, InstrumentType, UserMode } from '../types';
+import { Track, InstrumentType, UserMode, MidiInstrumentName } from '../types';
 import { 
   Guitar, Mic, Drum, Music, Keyboard, Wind, 
-  WholeWord, Palette, Edit3, X, Zap, Bot, Mic2 
+  WholeWord, Palette, Edit3, X, Zap, Bot, Piano, Speaker
 } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
@@ -25,6 +25,17 @@ export const Inspector: React.FC<InspectorProps> = ({ track, mode, onUpdate, onC
     { type: 'WIND', icon: Wind, label: 'Viento' },
   ];
 
+  const midiPresets: {id: MidiInstrumentName, label: string}[] = [
+      { id: 'GRAND_PIANO', label: 'Grand Piano' },
+      { id: 'SYNTH_STRINGS', label: 'Synth Strings' },
+      { id: 'ELECTRIC_GUITAR', label: 'Electric Guitar' },
+      { id: 'TRUMPET', label: 'Trumpet' },
+      { id: 'BRASS_SECTION', label: 'Brass Section' },
+      { id: 'CHURCH_ORGAN', label: 'Church Organ' },
+      { id: 'SINE_LEAD', label: 'Sine Lead' },
+      { id: 'PERCUSSION_KIT', label: 'Percussion Kit' },
+  ];
+
   const colors = [
     'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 
     'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500',
@@ -33,15 +44,16 @@ export const Inspector: React.FC<InspectorProps> = ({ track, mode, onUpdate, onC
 
   const handleFxChange = (type: 'reverb' | 'pitch', value: number) => {
       if(!track) return;
-      
       const newEffects = { ...track.effects, [type]: value };
-      
-      // Update State
       onUpdate(track.id, { effects: newEffects });
-      
-      // Update Engine
       if(type === 'reverb') audioService.setReverb(track.id, value);
       if(type === 'pitch') audioService.setPitch(track.id, value);
+  };
+
+  const handlePresetChange = (preset: MidiInstrumentName) => {
+      if(!track) return;
+      onUpdate(track.id, { midiInstrument: preset });
+      audioService.updateInstrumentPreset(track.id, preset);
   };
 
   return (
@@ -66,9 +78,25 @@ export const Inspector: React.FC<InspectorProps> = ({ track, mode, onUpdate, onC
         </div>
       </div>
 
+      {/* MIDI PRESET SELECTOR (NEW) */}
+      {(track.type === 'MIDI' || track.type === 'CHORD' || track.type === 'MELODY') && (
+          <div className="p-4 border-t border-gray-700/50 bg-cyan-900/10">
+              <label className="text-xs font-bold text-cyan-500 uppercase block mb-2 flex items-center"><Piano size={12} className="mr-1"/> Sonido Virtual (MIDI)</label>
+              <select 
+                  className="w-full bg-gray-900 text-white p-2 rounded border border-cyan-700 focus:outline-none focus:border-cyan-500 font-bold text-sm"
+                  value={track.midiInstrument || 'GRAND_PIANO'}
+                  onChange={(e) => handlePresetChange(e.target.value as MidiInstrumentName)}
+              >
+                  {midiPresets.map(p => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+              </select>
+          </div>
+      )}
+
       {/* Instrument Icon Selector */}
       <div className="p-4 border-t border-gray-700/50">
-        <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Instrumento</label>
+        <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Icono</label>
         <div className="grid grid-cols-3 gap-2">
             {instruments.map(inst => (
                 <button 
@@ -85,7 +113,7 @@ export const Inspector: React.FC<InspectorProps> = ({ track, mode, onUpdate, onC
 
       {/* Color Selector */}
       <div className="p-4 border-t border-gray-700/50">
-        <label className="text-xs font-bold text-gray-500 uppercase block mb-2 flex items-center"><Palette size={12} className="mr-1"/> Color de Pista</label>
+        <label className="text-xs font-bold text-gray-500 uppercase block mb-2 flex items-center"><Palette size={12} className="mr-1"/> Color</label>
         <div className="flex flex-wrap gap-2">
             {colors.map(c => (
                 <button 

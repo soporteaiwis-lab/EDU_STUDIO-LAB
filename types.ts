@@ -1,3 +1,4 @@
+
 export enum UserMode {
   EXPLORER = 'EXPLORER',
   MAKER = 'MAKER',
@@ -10,11 +11,18 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '2.0',
+  version: '2.1.0 BETA (MIDI)',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
 };
+
+export interface ProjectState {
+  bpm: number;
+  timeSignature: string; // '4/4'
+  isMetronomeOn: boolean;
+  transportStatus: 'STOP' | 'PLAY' | 'RECORD';
+}
 
 export interface TrackEQ {
   high: number;
@@ -29,6 +37,8 @@ export interface TrackEffects {
 }
 
 export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'MELODY' | 'SAMPLER' | 'UNKNOWN';
+
+export type MidiInstrumentName = 'GRAND_PIANO' | 'SYNTH_STRINGS' | 'ELECTRIC_GUITAR' | 'TRUMPET' | 'BRASS_SECTION' | 'CHURCH_ORGAN' | 'PERCUSSION_KIT' | 'SINE_LEAD';
 
 export interface ChordEvent {
   bar: number;
@@ -47,46 +57,57 @@ export interface MelodyEvent {
   time: string;
 }
 
+// New MIDI Note Structure for recording
+export interface MidiNote {
+  note: string;      // e.g. "C4"
+  midi: number;      // e.g. 60
+  startTime: number; // Seconds relative to track start
+  duration: number;  // Seconds
+  velocity: number;  // 0-1
+}
+
 export interface Track {
   id: string;
   name: string;
   type: 'AUDIO' | 'MIDI' | 'AI_GENERATED' | 'CHORD' | 'RHYTHM' | 'MELODY' | 'DRUMS' | 'SAMPLER';
   instrument: InstrumentType;
+  midiInstrument?: MidiInstrumentName; // The selected sound preset
   color: string;
-  volume: number;
-  pan: number;
+  volume: number; // 0-100
+  pan: number; // -50 to 50
   eq: TrackEQ;
   effects: TrackEffects; 
   isMuted: boolean;
   isSolo: boolean;
   isArmed: boolean;
-  audioUrl?: string; // For AUDIO tracks (long)
-  samplerUrl?: string; // For SAMPLER tracks (short SFX)
+  audioUrl?: string; 
+  samplerUrl?: string; 
   isSelected?: boolean;
   chordData?: ChordEvent[]; 
   rhythmData?: DrumEvent[];
   melodyData?: MelodyEvent[];
+  midiNotes?: MidiNote[]; // Recorded MIDI data
 }
 
 export interface SongMetadata {
   lyrics: string;
-  script?: string; // New: For podcast/play scripts
-  sfxSuggestions?: SFXSuggestion[]; // New: AI Suggestions
+  script?: string;
+  sfxSuggestions?: SFXSuggestion[];
   chords?: GeneratedChords;
   melody?: GeneratedMelody;
   rhythm?: GeneratedRhythm;
   key: string;
   bpm: number;
-  timeSignature: [number, number]; // New: [4, 4]
+  timeSignature: [number, number];
   title: string;
   author: string;
 }
 
 export interface SFXSuggestion {
   id: string;
-  textContext: string; // The phrase triggering the SFX
-  soundDescription: string; // "Door slamming shut"
-  timeOffset?: number; // Approximate time if analyzable
+  textContext: string;
+  soundDescription: string;
+  timeOffset?: number;
 }
 
 export interface MetronomeConfig {
