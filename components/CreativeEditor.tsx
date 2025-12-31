@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { generateLyrics, generateProgression, generateRhythm, generateMelody, analyzeScriptForSFX } from '../services/geminiService';
 import { audioService } from '../services/audioService';
@@ -94,13 +95,18 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                             <div className="bg-purple-50 p-6 rounded-3xl space-y-6 border-2 border-purple-100">
                                 <div>
                                     <label className="block text-sm font-bold text-purple-800 mb-2">¿De qué tratará tu canción?</label>
-                                    <input value={topic} onChange={e => setTopic(e.target.value)} className="w-full p-4 rounded-xl border-2 border-purple-200 focus:outline-none focus:border-purple-500 text-lg" placeholder="Ej: El ciclo del agua, Mis vacaciones..."/>
+                                    <input 
+                                        value={topic} 
+                                        onChange={e => setTopic(e.target.value)} 
+                                        className="w-full p-4 rounded-xl border-2 border-purple-200 focus:outline-none focus:border-purple-500 text-lg text-purple-900 placeholder-purple-300" 
+                                        placeholder="Ej: El ciclo del agua, Mis vacaciones..."
+                                    />
                                 </div>
                                 <button onClick={doGenerateLyrics} disabled={isLoading||!topic} className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl shadow-lg hover:bg-purple-700 transition transform hover:scale-[1.02]">{isLoading?'Escribiendo...':'Generar Letra'}</button>
                             </div>
                         ) : (
                             <div className="space-y-4 animate-fade-in">
-                                <div className="bg-white border-2 border-purple-100 p-6 rounded-2xl whitespace-pre-wrap shadow-sm text-gray-700 font-mono text-sm leading-relaxed">{lyricsRes.content}</div>
+                                <div className="bg-white border-2 border-purple-100 p-6 rounded-2xl whitespace-pre-wrap shadow-sm text-gray-800 font-mono text-sm leading-relaxed">{lyricsRes.content}</div>
                                 <div className="flex gap-3">
                                     <button onClick={()=>setLyricsRes(null)} className="flex-1 py-3 bg-gray-100 font-bold text-gray-600 rounded-xl hover:bg-gray-200">Volver</button>
                                     <button onClick={()=>{onImportLyrics(lyricsRes.content);onClose()}} className="flex-1 py-3 bg-green-500 font-bold text-white rounded-xl hover:bg-green-600 shadow-lg">Importar al Cancionero</button>
@@ -121,13 +127,13 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                         <label className="block text-sm font-bold text-blue-800 mb-2">Tonalidad</label>
                                         <div className="grid grid-cols-4 gap-2">
                                             {keys.map(k => (
-                                                <button key={k} onClick={() => setChordKey(k)} className={`p-2 rounded-lg font-bold border-2 transition ${chordKey === k ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>{k}</button>
+                                                <button key={k} onClick={() => setChordKey(k)} className={`p-2 rounded-lg font-bold border-2 transition ${chordKey === k ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'}`}>{k}</button>
                                             ))}
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-blue-800 mb-2">Estilo / Emoción</label>
-                                        <select value={chordMood} onChange={e => setChordMood(e.target.value)} className="w-full p-3 rounded-xl border-2 border-blue-200 font-bold text-gray-700 focus:outline-none focus:border-blue-500">
+                                        <select value={chordMood} onChange={e => setChordMood(e.target.value)} className="w-full p-3 rounded-xl border-2 border-blue-200 font-bold text-blue-900 focus:outline-none focus:border-blue-500 bg-white">
                                             <option>Pop Feliz</option>
                                             <option>Balada Triste</option>
                                             <option>Rock Épico</option>
@@ -141,12 +147,12 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                         ) : (
                             <div className="space-y-4 animate-fade-in">
                                 <div className="bg-white border-2 border-blue-100 p-6 rounded-3xl shadow-sm text-center">
-                                    <h4 className="text-xl font-bold text-gray-700 mb-4">Progresión en {chordsRes.key}</h4>
+                                    <h4 className="text-xl font-bold text-gray-800 mb-4">Progresión en {chordsRes.key}</h4>
                                     <div className="flex flex-wrap justify-center gap-2 mb-4">
                                         {chordsRes.progression.map((c, i) => (
                                             <div key={i} className="bg-blue-50 border border-blue-200 p-3 rounded-xl min-w-[80px]">
-                                                <div className="text-xs text-blue-400 font-bold uppercase">Compás {c.bar}</div>
-                                                <div className="text-2xl font-black text-blue-800">{c.name}</div>
+                                                <div className="text-xs text-blue-500 font-bold uppercase">Compás {c.bar}</div>
+                                                <div className="text-2xl font-black text-blue-900">{c.name}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -170,7 +176,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                     <label className="block text-sm font-bold text-red-800 mb-2">Estilo de Batería</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         {['Rock', 'Pop', 'Hip Hop', 'Electronic', 'Reggaeton', 'Jazz'].map(s => (
-                                            <button key={s} onClick={() => setDrumStyle(s)} className={`p-4 rounded-xl font-bold border-2 text-left transition ${drumStyle === s ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:border-red-300'}`}>
+                                            <button key={s} onClick={() => setDrumStyle(s)} className={`p-4 rounded-xl font-bold border-2 text-left transition ${drumStyle === s ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'}`}>
                                                 <Drum size={20} className="mb-2 opacity-50"/>
                                                 {s}
                                             </button>
@@ -182,7 +188,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                         ) : (
                             <div className="space-y-4 animate-fade-in">
                                 <div className="bg-white border-2 border-red-100 p-6 rounded-3xl shadow-sm text-center">
-                                    <h4 className="text-xl font-bold text-gray-700 mb-2">Patrón: {rhythmRes.style}</h4>
+                                    <h4 className="text-xl font-bold text-gray-800 mb-2">Patrón: {rhythmRes.style}</h4>
                                     <p className="text-gray-500 text-sm">Patrón de 2 compases generado con IA</p>
                                 </div>
                                 <div className="flex gap-3">
@@ -203,15 +209,15 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-bold text-yellow-800 mb-2">Tonalidad</label>
-                                        <select value={melodyKey} onChange={e => setMelodyKey(e.target.value)} className="w-full p-3 rounded-xl border-2 border-yellow-200 font-bold text-gray-700">
+                                        <select value={melodyKey} onChange={e => setMelodyKey(e.target.value)} className="w-full p-3 rounded-xl border-2 border-yellow-200 font-bold text-yellow-900 bg-white focus:outline-none">
                                             {keys.map(k => <option key={k} value={k}>{k}</option>)}
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-yellow-800 mb-2">Clave / Rango</label>
                                         <div className="flex gap-2">
-                                            <button onClick={() => setMelodyClef('TREBLE')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='TREBLE'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-600'}`}>Agudo</button>
-                                            <button onClick={() => setMelodyClef('BASS')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='BASS'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-600'}`}>Grave</button>
+                                            <button onClick={() => setMelodyClef('TREBLE')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='TREBLE'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-700'}`}>Agudo</button>
+                                            <button onClick={() => setMelodyClef('BASS')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='BASS'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-700'}`}>Grave</button>
                                         </div>
                                     </div>
                                 </div>
@@ -241,8 +247,13 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                          <h3 className="text-3xl font-black text-orange-600 font-fredoka text-center">Analizador de Guiones SFX</h3>
                          {!sfxRes ? (
                              <div className="bg-orange-50 p-6 rounded-3xl space-y-4 border-2 border-orange-100">
-                                 <p className="text-gray-600 font-bold">Pega tu cuento o guion aquí. La IA sugerirá dónde poner efectos de sonido.</p>
-                                 <textarea value={scriptText} onChange={e => setScriptText(e.target.value)} className="w-full h-40 p-4 rounded-xl border-2 border-orange-200 resize-none focus:outline-none focus:border-orange-500" placeholder="Había una vez un perro que ladraba fuerte..."></textarea>
+                                 <p className="text-orange-800 font-bold">Pega tu cuento o guion aquí. La IA sugerirá dónde poner efectos de sonido.</p>
+                                 <textarea 
+                                    value={scriptText} 
+                                    onChange={e => setScriptText(e.target.value)} 
+                                    className="w-full h-40 p-4 rounded-xl border-2 border-orange-200 resize-none focus:outline-none focus:border-orange-500 text-gray-900 placeholder-orange-300" 
+                                    placeholder="Había una vez un perro que ladraba fuerte..."
+                                 ></textarea>
                                  <button onClick={doAnalyzeScript} disabled={isLoading||!scriptText} className="w-full py-4 bg-orange-600 text-white font-bold rounded-xl shadow-lg hover:bg-orange-700 transition transform hover:scale-[1.02]">{isLoading?'Analizando...':'Detectar Efectos'}</button>
                              </div>
                          ) : (
@@ -252,7 +263,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                          <div key={i} className="bg-white border-l-4 border-orange-500 p-4 rounded shadow-sm flex justify-between items-center hover:bg-orange-50 transition">
                                              <div>
                                                  <div className="text-xs text-gray-400 font-bold uppercase">Contexto: "{sfx.textContext}"</div>
-                                                 <div className="font-bold text-lg text-orange-800">{sfx.soundDescription}</div>
+                                                 <div className="font-bold text-lg text-orange-900">{sfx.soundDescription}</div>
                                              </div>
                                              <button className="p-2 bg-orange-100 text-orange-600 rounded-full hover:bg-orange-200"><Zap size={16}/></button>
                                          </div>
