@@ -49,7 +49,7 @@ const EduStudioLogo = ({ size = 'normal' }: { size?: 'normal' | 'large' }) => {
             </div>
 
             <div className={`flex flex-col ${isLarge ? 'text-center md:text-left' : 'text-left'}`}>
-                <span className={`font-brand font-black tracking-tighter text-[#1e293b] dark:text-white ${textSize} leading-none drop-shadow-sm`}>
+                <span className={`font-brand font-black tracking-tighter text-[#ff8000] dark:text-white ${textSize} leading-none drop-shadow-sm`}>
                     Edu<span className="text-[#0EA5E9]">Studio</span>
                 </span>
                 <span className={`${subTextSize} font-bold text-gray-500 tracking-[0.15em] uppercase mt-1`}>
