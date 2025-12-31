@@ -11,7 +11,7 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '3.0.0 PRO-X',
+  version: '3.1.0 LMS-CL',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
@@ -24,16 +24,9 @@ export interface AudioDevice {
 }
 
 export interface LoopRegion {
-  startBar: number; // Start in Bars (1-indexed or 0-indexed depending on logic, let's use 0-indexed internally)
-  endBar: number;   // End in Bars
+  startBar: number;
+  endBar: number;
   isActive: boolean;
-}
-
-export interface ProjectState {
-  bpm: number;
-  timeSignature: string; // '4/4'
-  isMetronomeOn: boolean;
-  transportStatus: 'STOP' | 'PLAY' | 'RECORD';
 }
 
 export interface TrackEQ {
@@ -49,32 +42,18 @@ export interface TrackEffects {
 }
 
 export type InstrumentType = 'DRUMS' | 'GUITAR' | 'BASS' | 'KEYS' | 'VOCAL' | 'WIND' | 'FX' | 'CHORD' | 'MELODY' | 'SAMPLER' | 'UNKNOWN';
-
 export type MidiInstrumentName = 'GRAND_PIANO' | 'SYNTH_STRINGS' | 'ELECTRIC_GUITAR' | 'TRUMPET' | 'BRASS_SECTION' | 'CHURCH_ORGAN' | 'PERCUSSION_KIT' | 'SINE_LEAD';
 
-export interface ChordEvent {
-  bar: number;
-  name: string;
-  duration: number;
-}
-
-export interface DrumEvent {
-  time: string;
-  instrument: 'KICK' | 'SNARE' | 'HIHAT';
-}
-
-export interface MelodyEvent {
-  note: string;
-  duration: string;
-  time: string;
-}
+export interface ChordEvent { bar: number; name: string; duration: number; }
+export interface DrumEvent { time: string; instrument: 'KICK' | 'SNARE' | 'HIHAT'; }
+export interface MelodyEvent { note: string; duration: string; time: string; }
 
 export interface MidiNote {
-  note: string;      // e.g. "C4"
-  midi: number;      // e.g. 60
-  startTime: number; // Seconds relative to track start
-  duration: number;  // Seconds
-  velocity: number;  // 0-1
+  note: string;
+  midi: number;
+  startTime: number;
+  duration: number;
+  velocity: number;
 }
 
 export interface Track {
@@ -84,8 +63,8 @@ export interface Track {
   instrument: InstrumentType;
   midiInstrument?: MidiInstrumentName;
   color: string;
-  volume: number; // 0-100
-  pan: number; // -50 to 50 (Left to Right)
+  volume: number;
+  pan: number;
   eq: TrackEQ;
   effects: TrackEffects; 
   isMuted: boolean;
@@ -114,56 +93,74 @@ export interface SongMetadata {
   author: string;
 }
 
-export interface SFXSuggestion {
-  id: string;
-  textContext: string;
-  soundDescription: string;
-  timeOffset?: number;
-}
+export interface SFXSuggestion { id: string; textContext: string; soundDescription: string; timeOffset?: number; }
+export interface Session { id: string; name: string; lastModified: number; bpm: number; tracks: Track[]; metadata?: SongMetadata; }
 
-export interface Session {
+// --- AI GENERATION TYPES ---
+export interface GeneratedLyrics { title: string; content: string; }
+export interface GeneratedChords { key: string; progression: ChordEvent[]; melodyHint?: string; }
+export interface GeneratedMelody { clef: 'TREBLE' | 'BASS'; key: string; events: MelodyEvent[]; abc: string; }
+export interface GeneratedRhythm { style: string; bpm: number; events: DrumEvent[]; }
+export interface GeneratedSFXList { suggestions: SFXSuggestion[]; }
+
+// --- TEACHER / LMS TYPES (NEW) ---
+
+export interface StudentProfile {
   id: string;
+  rut: string;
   name: string;
-  lastModified: number;
-  bpm: number;
-  tracks: Track[];
-  metadata?: SongMetadata;
+  email: string;
+  instrument?: string;
+  avatar?: string;
 }
 
-export interface GeneratedLyrics {
+export interface Course {
+  id: string;
+  name: string; // "1° Medio A"
+  level: string; 
+  students: StudentProfile[];
+  color: string;
+}
+
+export interface RubricLevel {
+  label: string; // "Excelente", "Bueno"
+  points: number; // 4, 3
+  description: string;
+}
+
+export interface RubricCriterion {
+  id: string;
+  name: string; // "Pulso"
+  weight: number; // Percentage 0-100
+  levels: RubricLevel[];
+}
+
+export interface Rubric {
+  id: string;
   title: string;
-  content: string;
+  description: string;
+  criteria: RubricCriterion[];
+  totalPoints: number;
 }
 
-export interface GeneratedChords {
-  key: string;
-  progression: ChordEvent[];
-  melodyHint?: string;
-}
-
-export interface GeneratedMelody {
-  clef: 'TREBLE' | 'BASS';
-  key: string;
-  events: MelodyEvent[];
-  abc: string;
-}
-
-export interface GeneratedRhythm {
-  style: string;
-  bpm: number;
-  events: DrumEvent[];
-}
-
-export interface GeneratedSFXList {
-  suggestions: SFXSuggestion[];
+export interface Evaluation {
+  studentId: string;
+  assignmentId: string;
+  rubricScores: Record<string, number>; // criterionId -> points
+  totalScore: number;
+  grade: number; // 1.0 - 7.0
+  feedback: string;
+  status: 'GRADED' | 'PENDING';
 }
 
 export interface Assignment {
   id: string;
+  courseId: string;
   title: string;
   description: string;
-  oa: string;
+  oa: string; // "OA 03"
   deadline: string;
-  status: 'PENDING' | 'GRADED' | 'SUBMITTED';
-  grade?: number;
+  status: 'OPEN' | 'CLOSED';
+  rubricId?: string;
+  evaluations?: Evaluation[];
 }
