@@ -57,7 +57,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
   const keys = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb', 'Am', 'Em', 'Dm'];
 
   return (
-    <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center z-50 p-4 font-nunito">
+    <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center z-50 p-4 font-nunito text-gray-800">
       <div className="bg-white w-full max-w-5xl h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col border-4 border-white">
         
         {/* HEADER */}
@@ -98,7 +98,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                     <input 
                                         value={topic} 
                                         onChange={e => setTopic(e.target.value)} 
-                                        className="w-full p-4 rounded-xl border-2 border-purple-200 focus:outline-none focus:border-purple-500 text-lg text-purple-900 placeholder-purple-300" 
+                                        className="w-full p-4 rounded-xl border-2 border-purple-200 focus:outline-none focus:border-purple-500 text-lg text-purple-900 placeholder-purple-300 font-bold bg-white" 
                                         placeholder="Ej: El ciclo del agua, Mis vacaciones..."
                                     />
                                 </div>
@@ -106,7 +106,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                             </div>
                         ) : (
                             <div className="space-y-4 animate-fade-in">
-                                <div className="bg-white border-2 border-purple-100 p-6 rounded-2xl whitespace-pre-wrap shadow-sm text-gray-800 font-mono text-sm leading-relaxed">{lyricsRes.content}</div>
+                                <div className="bg-white border-2 border-purple-100 p-6 rounded-2xl whitespace-pre-wrap shadow-sm text-gray-900 font-mono text-sm leading-relaxed">{lyricsRes.content}</div>
                                 <div className="flex gap-3">
                                     <button onClick={()=>setLyricsRes(null)} className="flex-1 py-3 bg-gray-100 font-bold text-gray-600 rounded-xl hover:bg-gray-200">Volver</button>
                                     <button onClick={()=>{onImportLyrics(lyricsRes.content);onClose()}} className="flex-1 py-3 bg-green-500 font-bold text-white rounded-xl hover:bg-green-600 shadow-lg">Importar al Cancionero</button>
@@ -127,18 +127,18 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                         <label className="block text-sm font-bold text-blue-800 mb-2">Tonalidad</label>
                                         <div className="grid grid-cols-4 gap-2">
                                             {keys.map(k => (
-                                                <button key={k} onClick={() => setChordKey(k)} className={`p-2 rounded-lg font-bold border-2 transition ${chordKey === k ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'}`}>{k}</button>
+                                                <button key={k} onClick={() => setChordKey(k)} className={`p-2 rounded-lg font-bold border-2 transition ${chordKey === k ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-900 border-gray-200 hover:border-blue-300'}`}>{k}</button>
                                             ))}
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-blue-800 mb-2">Estilo / Emoción</label>
                                         <select value={chordMood} onChange={e => setChordMood(e.target.value)} className="w-full p-3 rounded-xl border-2 border-blue-200 font-bold text-blue-900 focus:outline-none focus:border-blue-500 bg-white">
-                                            <option>Pop Feliz</option>
-                                            <option>Balada Triste</option>
-                                            <option>Rock Épico</option>
-                                            <option>Reggaeton</option>
-                                            <option>Lo-Fi Chill</option>
+                                            <option value="Pop Feliz">Pop Feliz</option>
+                                            <option value="Balada Triste">Balada Triste</option>
+                                            <option value="Rock Épico">Rock Épico</option>
+                                            <option value="Reggaeton">Reggaeton</option>
+                                            <option value="Lo-Fi Chill">Lo-Fi Chill</option>
                                         </select>
                                     </div>
                                 </div>
@@ -176,7 +176,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                     <label className="block text-sm font-bold text-red-800 mb-2">Estilo de Batería</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         {['Rock', 'Pop', 'Hip Hop', 'Electronic', 'Reggaeton', 'Jazz'].map(s => (
-                                            <button key={s} onClick={() => setDrumStyle(s)} className={`p-4 rounded-xl font-bold border-2 text-left transition ${drumStyle === s ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'}`}>
+                                            <button key={s} onClick={() => setDrumStyle(s)} className={`p-4 rounded-xl font-bold border-2 text-left transition ${drumStyle === s ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-900 border-gray-200 hover:border-red-300'}`}>
                                                 <Drum size={20} className="mb-2 opacity-50"/>
                                                 {s}
                                             </button>
@@ -216,8 +216,8 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                     <div>
                                         <label className="block text-sm font-bold text-yellow-800 mb-2">Clave / Rango</label>
                                         <div className="flex gap-2">
-                                            <button onClick={() => setMelodyClef('TREBLE')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='TREBLE'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-700'}`}>Agudo</button>
-                                            <button onClick={() => setMelodyClef('BASS')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='BASS'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-700'}`}>Grave</button>
+                                            <button onClick={() => setMelodyClef('TREBLE')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='TREBLE'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-900'}`}>Agudo</button>
+                                            <button onClick={() => setMelodyClef('BASS')} className={`flex-1 p-2 rounded-lg font-bold border-2 ${melodyClef==='BASS'?'bg-yellow-500 text-white border-yellow-600':'bg-white text-gray-900'}`}>Grave</button>
                                         </div>
                                     </div>
                                 </div>
@@ -251,7 +251,7 @@ export const CreativeEditor: React.FC<CreativeEditorProps> = ({ onClose, onImpor
                                  <textarea 
                                     value={scriptText} 
                                     onChange={e => setScriptText(e.target.value)} 
-                                    className="w-full h-40 p-4 rounded-xl border-2 border-orange-200 resize-none focus:outline-none focus:border-orange-500 text-gray-900 placeholder-orange-300" 
+                                    className="w-full h-40 p-4 rounded-xl border-2 border-orange-200 resize-none focus:outline-none focus:border-orange-500 text-orange-900 placeholder-orange-300 font-medium bg-white" 
                                     placeholder="Había una vez un perro que ladraba fuerte..."
                                  ></textarea>
                                  <button onClick={doAnalyzeScript} disabled={isLoading||!scriptText} className="w-full py-4 bg-orange-600 text-white font-bold rounded-xl shadow-lg hover:bg-orange-700 transition transform hover:scale-[1.02]">{isLoading?'Analizando...':'Detectar Efectos'}</button>
