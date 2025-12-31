@@ -119,13 +119,18 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                     <div className="bg-white/20 p-2 rounded-full">{getIcon()}</div>
                     
                     {track.type !== 'CHORD' && (
-                        <button 
-                            onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
-                            className={`p-3 rounded-full border-4 shadow-sm transition-all ${track.isArmed ? 'bg-red-500 border-red-200 animate-pulse text-white' : 'bg-gray-200 border-gray-300 text-gray-400 hover:bg-gray-300'}`}
-                            title="GRABAR AQUÍ"
-                        >
-                            <CircleDot size={24} fill={track.isArmed ? "white" : "transparent"}/>
-                        </button>
+                        <div className="flex flex-col items-center">
+                            <button 
+                                onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
+                                className={`p-3 rounded-full border-4 shadow-xl transition-all hover:scale-105 active:scale-95 ${track.isArmed ? 'bg-red-600 border-red-200 animate-pulse text-white shadow-red-500/50' : 'bg-gray-200 border-gray-400 text-gray-500 hover:bg-white hover:text-red-500'}`}
+                                title={track.isArmed ? "LISTO PARA GRABAR" : "ACTIVAR GRABACIÓN"}
+                            >
+                                <CircleDot size={28} fill={track.isArmed ? "white" : "transparent"}/>
+                            </button>
+                            <span className={`text-[9px] font-bold mt-1 uppercase ${track.isArmed ? 'text-red-300 animate-pulse' : 'text-gray-400'}`}>
+                                {track.isArmed ? 'Armado' : 'Grabar'}
+                            </span>
+                        </div>
                     )}
                 </div>
 

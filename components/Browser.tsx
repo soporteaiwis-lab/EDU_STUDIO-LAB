@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { UserMode, Session } from '../types';
-import { Search, Music, Cloud, Trash2, Upload, Sparkles, PlayCircle, FileAudio, Zap } from 'lucide-react';
+import { Search, Music, Cloud, Trash2, Upload, Sparkles, PlayCircle, FileAudio, Zap, ChevronRight } from 'lucide-react';
 import { generateRhythm } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 
@@ -61,8 +61,8 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
   return (
     <div className="w-72 flex-shrink-0 bg-[#1e1e1e] border-l border-black text-gray-300 flex flex-col h-full animate-slide-left z-30 shadow-xl font-nunito">
        
-       {/* Tabs */}
-       <div className="flex border-b border-black">
+       {/* HEADER & TABS */}
+       <div className="flex border-b border-black items-center bg-[#151515]">
            <button 
                 onClick={() => setActiveTab('SAMPLES')} 
                 className={`flex-1 p-3 text-xs font-bold uppercase tracking-wider ${activeTab === 'SAMPLES' ? 'bg-[#2a2a2a] text-white border-b-2 border-cyan-500' : 'text-gray-500 hover:bg-[#252525]'}`}
@@ -74,6 +74,14 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
                 className={`flex-1 p-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center ${activeTab === 'CLOUD' ? 'bg-[#2a2a2a] text-white border-b-2 border-cyan-500' : 'text-gray-500 hover:bg-[#252525]'}`}
             >
                 <Cloud size={12} className="mr-1"/> Mi Nube
+           </button>
+           {/* CLOSE BUTTON */}
+           <button 
+                onClick={onClose} 
+                className="p-3 text-gray-500 hover:text-white hover:bg-red-500/20 border-l border-[#333] flex items-center justify-center transition-colors"
+                title="Plegar panel"
+           >
+               <ChevronRight size={16}/>
            </button>
        </div>
 

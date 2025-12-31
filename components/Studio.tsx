@@ -11,7 +11,7 @@ import { PianoRollEditor } from './PianoRollEditor';
 import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
 import { Track, UserMode, SongMetadata, MidiNote, AudioDevice, LoopRegion } from '../types';
-import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat } from 'lucide-react';
+import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown } from 'lucide-react';
 
 interface StudioProps {
   userMode: UserMode;
@@ -58,6 +58,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   // Metronome Settings State
   const [showMetronomeSettings, setShowMetronomeSettings] = useState(false);
   const [metronomeVolume, setMetronomeVolume] = useState(-10);
+  const [countIn, setCountIn] = useState<'OFF' | '1BAR' | '2BAR'>('OFF');
   const [tapTempoTaps, setTapTempoTaps] = useState<number[]>([]);
 
   const recordingTrackIdRef = useRef<string | null>(null);
@@ -247,7 +248,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       return;
     }
     const target = tracks.find(t => t.isArmed);
-    if (!target) { alert("¡Primero arma una pista!"); return; }
+    if (!target) { alert("¡Primero arma una pista! (Presiona el botón 'Armar' o 'R' en la pista)"); return; }
 
     try { 
         if (target.type === 'AUDIO') {
@@ -326,7 +327,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     <div className="flex flex-col h-screen bg-studio-dark font-nunito select-none overflow-hidden relative text-gray-200">
         
         {/* TOP BAR / TRANSPORT (Visual overhaul to "Armonia" style) */}
-        <div className="h-16 flex-shrink-0 bg-black/40 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between z-50">
+        <div className="h-16 flex-shrink-0 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between z-50">
              
              {/* Left Controls */}
              <div className="flex items-center space-x-3">
@@ -346,45 +347,102 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                  </button>
              </div>
 
-             {/* Center Display */}
+             {/* Center Display (LCD LOOK) */}
              <div className="relative mx-4 flex-1 max-w-lg" ref={metronomeRef}>
-                 <div className="bg-black/50 rounded-xl border border-white/10 p-1 flex items-center justify-center space-x-2 shadow-inner h-12">
+                 <div className="bg-[#111] rounded-lg border border-[#333] p-0.5 flex items-center justify-between shadow-inner h-12 px-2 relative">
                      
-                     {/* BPM Control */}
-                     <div className="flex items-center px-3 py-1 cursor-pointer hover:bg-white/5 rounded transition" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
+                     {/* BPM Section */}
+                     <div className="flex items-center px-3 py-1 cursor-pointer hover:bg-white/5 rounded transition border-r border-[#333] h-full" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
                          <div className="flex flex-col items-center">
-                             <span className="text-[9px] font-bold text-gray-500 leading-none tracking-wider">BPM</span>
+                             <span className="text-[9px] font-bold text-gray-500 leading-none tracking-wider mb-0.5">BPM</span>
                              <span className="text-xl font-mono font-bold text-cyan-400 leading-none">{bpm}</span>
                          </div>
                      </div>
 
-                     {/* Time Sig */}
-                     <div className="flex flex-col items-center justify-center px-2 border-l border-white/10">
-                         <span className="text-sm font-mono font-bold text-gray-300">{timeSignature}</span>
+                     {/* Time Sig Section */}
+                     <div className="flex flex-col items-center justify-center px-3 border-r border-[#333] h-full cursor-pointer hover:bg-white/5" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
+                          <span className="text-[9px] font-bold text-gray-500 leading-none mb-0.5">COMPÁS</span>
+                          <span className="text-lg font-mono font-bold text-gray-300 leading-none flex items-center">
+                             {timeSignature} <ChevronDown size={10} className="ml-1 opacity-50"/>
+                          </span>
+                     </div>
+
+                     {/* Key Section (Static for now) */}
+                     <div className="flex flex-col items-center justify-center px-3 border-r border-[#333] h-full">
+                          <span className="text-[9px] font-bold text-gray-500 leading-none mb-0.5">TONO</span>
+                          <span className="text-lg font-mono font-bold text-gray-300 leading-none">{metadata.key}</span>
                      </div>
 
                      {/* Metronome Toggle */}
                      <button 
                         onClick={() => setMetronomeOn(!metronomeOn)} 
-                        className={`p-2 rounded transition-all ${metronomeOn ? 'text-cyan-400' : 'text-gray-600 hover:text-gray-400'}`}
+                        className={`h-8 w-8 ml-2 rounded flex items-center justify-center transition-all ${metronomeOn ? 'bg-cyan-900/40 text-cyan-400 border border-cyan-700' : 'text-gray-600 hover:text-gray-400'}`}
                      >
                         <Settings size={18} className={metronomeOn ? "animate-spin-slow" : ""}/>
                      </button>
                  </div>
 
-                  {/* METRONOME POPOVER (Keep existing code logic, styling fits dark mode) */}
+                  {/* METRONOME POPOVER (Replicating BandLab Style) */}
                  {showMetronomeSettings && (
-                     <div className="absolute top-14 left-0 right-0 bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-4">
-                         <div className="flex justify-between items-center">
-                             <div className="text-sm font-bold text-white">Pulsa Tempo</div>
-                             <button onClick={handleTapTempo} className="bg-[#2a2a2a] hover:bg-[#333] text-cyan-400 border border-gray-600 rounded-lg px-6 py-3 font-mono text-xl font-bold flex flex-col items-center min-w-[120px]">
-                                 <span>{bpm}</span><span className="text-[9px] text-gray-500 uppercase">Tocar</span>
+                     <div className="absolute top-14 left-0 right-0 bg-[#1e1e1e] border border-gray-600 rounded-xl shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-4 w-full">
+                         
+                         {/* Tap Tempo */}
+                         <div className="flex justify-between items-center bg-[#111] p-2 rounded-lg border border-gray-700">
+                             <div className="flex flex-col">
+                                 <div className="text-xs font-bold text-gray-400">Pulsa Tempo</div>
+                                 <div className="text-[9px] text-gray-600 uppercase">Tocar repetidamente</div>
+                             </div>
+                             <button 
+                                onClick={handleTapTempo} 
+                                className="bg-[#2a2a2a] hover:bg-[#333] active:scale-95 text-cyan-400 border border-gray-600 rounded-md w-16 h-10 font-mono text-xl font-bold flex items-center justify-center transition-all"
+                             >
+                                 {bpm}
                              </button>
                          </div>
+                         
                          <hr className="border-gray-700"/>
+                         
+                         {/* Time Signature */}
+                         <div className="flex justify-between items-center">
+                             <div className="text-xs font-bold text-gray-400">Compás</div>
+                             <select 
+                                value={timeSignature} 
+                                onChange={(e) => setTimeSignature(e.target.value)}
+                                className="bg-[#111] text-white text-xs p-1 rounded border border-gray-700 outline-none"
+                             >
+                                 <option value="4/4">4 / 4</option>
+                                 <option value="3/4">3 / 4</option>
+                                 <option value="6/8">6 / 8</option>
+                             </select>
+                         </div>
+
+                         {/* Sound */}
+                         <div className="flex justify-between items-center">
+                             <div className="text-xs font-bold text-gray-400">Sonido</div>
+                             <select className="bg-[#111] text-white text-xs p-1 rounded border border-gray-700 outline-none w-24">
+                                 <option>Default</option>
+                                 <option>Woodblock</option>
+                                 <option>HiHat</option>
+                             </select>
+                         </div>
+
+                         {/* Count In */}
                          <div>
-                             <div className="flex justify-between text-xs font-bold text-gray-400 mb-2"><span>Volumen</span><span>{metronomeVolume} dB</span></div>
-                             <input type="range" min="-40" max="0" value={metronomeVolume} onChange={(e) => setMetronomeVolume(parseInt(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"/>
+                             <div className="text-xs font-bold text-gray-400 mb-2">Duración de cuenta</div>
+                             <div className="flex bg-[#111] p-1 rounded-lg border border-gray-700">
+                                 <button onClick={() => setCountIn('OFF')} className={`flex-1 py-1 text-[10px] font-bold rounded ${countIn === 'OFF' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>Off</button>
+                                 <button onClick={() => setCountIn('1BAR')} className={`flex-1 py-1 text-[10px] font-bold rounded ${countIn === '1BAR' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>1 compás</button>
+                                 <button onClick={() => setCountIn('2BAR')} className={`flex-1 py-1 text-[10px] font-bold rounded ${countIn === '2BAR' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>2 compases</button>
+                             </div>
+                         </div>
+
+                         {/* Volume */}
+                         <div>
+                             <div className="flex justify-between text-[10px] font-bold text-gray-500 mb-1"><span>Volumen</span><span>{metronomeVolume} dB</span></div>
+                             <div className="flex items-center space-x-2">
+                                <Volume2 size={12} className="text-gray-600"/>
+                                <input type="range" min="-40" max="0" value={metronomeVolume} onChange={(e) => setMetronomeVolume(parseInt(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
+                             </div>
                          </div>
                      </div>
                  )}
