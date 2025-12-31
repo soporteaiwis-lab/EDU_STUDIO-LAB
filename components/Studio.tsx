@@ -349,15 +349,23 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
 
                  <div className="w-px h-6 bg-white/10 mx-2"></div>
 
-                 {/* Transport */}
-                 <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white transition"><SkipBack size={18}/></button>
-                 <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 transition"><Square size={18}/></button>
-                 <button onClick={handlePlayToggle} className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 hover:scale-105 transition shadow-lg border border-white/5">
-                    {isPlaying ? <Pause size={20} fill="white"/> : <Play size={20} fill="white"/>}
-                 </button>
-                 <button onClick={handleRecordToggle} className={`p-3 rounded-full transition shadow-lg border border-white/5 ${isRecording ? 'bg-red-600 animate-pulse' : 'bg-white/10 hover:bg-white/20 hover:text-red-500'}`}>
-                    <Circle size={20} fill={isRecording ? "white" : "currentColor"} className={isRecording ? "text-white" : "text-red-500"}/>
-                 </button>
+                 {/* TRANSPORT CONTROLS (RESTORED FULL SET) */}
+                 <div className="flex items-center bg-[#18181b] rounded-full p-1 border border-white/5 ml-2 shadow-inner">
+                     <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Ir al Inicio"><SkipBack size={16}/></button>
+                     <button onClick={handleRewind} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Retroceder 10s"><Rewind size={16}/></button>
+                     <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-full transition" title="Detener"><Square size={16}/></button>
+                     
+                     <button onClick={handlePlayToggle} className="mx-2 p-3 bg-cyan-600 rounded-full text-white hover:bg-cyan-500 hover:scale-105 transition shadow-lg border border-cyan-400">
+                        {isPlaying ? <Pause size={20} fill="white"/> : <Play size={20} fill="white"/>}
+                     </button>
+                     
+                     <button onClick={handleRecordToggle} className={`mr-2 p-3 rounded-full transition shadow-lg border ${isRecording ? 'bg-red-600 border-red-400 animate-pulse' : 'bg-[#2a2a2a] border-gray-700 hover:bg-[#333] hover:text-red-500'}`} title="Grabar">
+                        <Circle size={20} fill={isRecording ? "white" : "currentColor"} className={isRecording ? "text-white" : "text-red-500"}/>
+                     </button>
+                     
+                     <button onClick={handleForward} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Avanzar 10s"><FastForward size={16}/></button>
+                     <button onClick={() => { const t = audioService.getCurrentTime(); audioService.setTime(t + 30); }} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Adelantar"><SkipForward size={16}/></button>
+                 </div>
              </div>
 
              {/* Center Display (LCD LOOK) */}
@@ -420,7 +428,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                      <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-1 text-gray-400 hover:text-white"><ZoomIn size={14}/></button>
                  </div>
 
-                 {/* Library Toggle (CRITICAL FIX) */}
+                 {/* Library Toggle */}
                  <button 
                     onClick={() => setShowBrowser(!showBrowser)} 
                     className={`p-2 rounded flex items-center space-x-1 transition-colors ${showBrowser ? 'bg-cyan-600 text-white shadow-lg' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
