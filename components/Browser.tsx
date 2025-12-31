@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { UserMode, Session } from '../types';
-import { Search, Music, Cloud, Trash2, Upload, Sparkles, PlayCircle, FileAudio, Zap, ChevronRight } from 'lucide-react';
+import { Search, Music, Cloud, Trash2, Upload, Sparkles, PlayCircle, FileAudio, Zap, ChevronRight, Speaker } from 'lucide-react';
 import { generateRhythm } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 
@@ -59,19 +59,19 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
   ];
 
   return (
-    <div className="w-72 flex-shrink-0 bg-[#1e1e1e] border-l border-black text-gray-300 flex flex-col h-full animate-slide-left z-30 shadow-xl font-nunito">
+    <div className="w-72 flex-shrink-0 bg-[#121212] border-l border-white/10 text-gray-300 flex flex-col h-full animate-slide-in-right z-30 shadow-2xl font-nunito relative">
        
        {/* HEADER & TABS */}
-       <div className="flex border-b border-black items-center bg-[#151515]">
+       <div className="flex border-b border-black items-center bg-[#18181b]">
            <button 
                 onClick={() => setActiveTab('SAMPLES')} 
-                className={`flex-1 p-3 text-xs font-bold uppercase tracking-wider ${activeTab === 'SAMPLES' ? 'bg-[#2a2a2a] text-white border-b-2 border-cyan-500' : 'text-gray-500 hover:bg-[#252525]'}`}
+                className={`flex-1 p-3 text-xs font-bold uppercase tracking-wider ${activeTab === 'SAMPLES' ? 'bg-[#27272a] text-cyan-400 border-b-2 border-cyan-500' : 'text-gray-500 hover:bg-[#202023]'}`}
            >
                 Librería
            </button>
            <button 
                 onClick={() => setActiveTab('CLOUD')} 
-                className={`flex-1 p-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center ${activeTab === 'CLOUD' ? 'bg-[#2a2a2a] text-white border-b-2 border-cyan-500' : 'text-gray-500 hover:bg-[#252525]'}`}
+                className={`flex-1 p-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center ${activeTab === 'CLOUD' ? 'bg-[#27272a] text-cyan-400 border-b-2 border-cyan-500' : 'text-gray-500 hover:bg-[#202023]'}`}
             >
                 <Cloud size={12} className="mr-1"/> Mi Nube
            </button>
@@ -87,30 +87,30 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
 
        {/* SAMPLES TAB */}
        {activeTab === 'SAMPLES' && (
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 bg-[#121212]">
             {/* Search */}
-            <div className="p-4 border-b border-gray-800">
-                <div className="flex items-center px-3 py-2 rounded bg-black/40 border border-gray-700">
+            <div className="p-4 border-b border-white/5">
+                <div className="flex items-center px-3 py-2 rounded bg-black/40 border border-white/10 focus-within:border-cyan-500/50 transition">
                     <Search size={14} className="text-gray-500 mr-2"/>
-                    <input type="text" placeholder="Buscar sonidos..." className="bg-transparent w-full text-xs text-white focus:outline-none"/>
+                    <input type="text" placeholder="Buscar sonidos..." className="bg-transparent w-full text-xs text-white focus:outline-none placeholder-gray-600"/>
                 </div>
             </div>
             
             {/* Import Button */}
-            <div className="px-4 mb-4">
+            <div className="px-4 mb-4 mt-2">
                 <input type="file" ref={fileInputRef} className="hidden" accept="audio/*" onChange={handleFileUpload} />
-                <button onClick={() => fileInputRef.current?.click()} className="w-full py-2 bg-blue-600 text-white rounded text-xs font-bold flex items-center justify-center hover:bg-blue-500 transition-colors">
+                <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded text-xs font-bold flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
                     <Upload size={14} className="mr-2"/> Importar MP3/WAV
                 </button>
             </div>
 
             {/* List */}
             <div className="flex-1 overflow-y-auto px-2 space-y-1">
-                <div className="text-[10px] font-bold text-gray-600 uppercase px-2 mb-2">Packs Disponibles</div>
+                <div className="text-[10px] font-bold text-gray-600 uppercase px-2 mb-2 tracking-wider">Packs Disponibles</div>
                 {SAMPLES.map((sample, i) => (
-                    <div key={i} className="p-2 rounded flex justify-between items-center hover:bg-[#2a2a2a] group transition-colors border border-transparent hover:border-gray-700">
-                        <div className="flex items-center space-x-3 truncate cursor-pointer flex-1" onClick={() => new Audio(sample.url).play()}>
-                            <div className="bg-gray-800 p-1.5 rounded-full group-hover:bg-cyan-900 group-hover:text-cyan-400 text-gray-500 transition-colors">
+                    <div key={i} className="p-2 rounded flex justify-between items-center hover:bg-[#1f1f22] group transition-colors border border-transparent hover:border-white/5 cursor-pointer">
+                        <div className="flex items-center space-x-3 truncate flex-1" onClick={() => new Audio(sample.url).play()}>
+                            <div className="bg-[#27272a] p-1.5 rounded-full group-hover:bg-cyan-500 group-hover:text-black text-gray-500 transition-colors">
                                 <PlayCircle size={14}/>
                             </div>
                             <span className="text-xs font-bold truncate text-gray-400 group-hover:text-white">{sample.name}</span>
@@ -121,11 +121,11 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
             </div>
 
             {/* AI Generator Footer */}
-            <div className="p-4 bg-[#151515] border-t border-black">
+            <div className="p-4 bg-[#18181b] border-t border-black">
                 <button 
                     onClick={handleGenerateDrums}
                     disabled={isGenerating}
-                    className={`w-full p-3 rounded-lg border-2 border-dashed border-yellow-500/50 bg-yellow-500/5 flex items-center justify-center space-x-2 ${isGenerating ? 'opacity-50' : 'hover:bg-yellow-500/10 hover:border-yellow-500 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)]'} transition-all duration-300`}
+                    className={`w-full p-3 rounded-lg border-2 border-dashed border-yellow-500/30 bg-yellow-500/5 flex items-center justify-center space-x-2 ${isGenerating ? 'opacity-50' : 'hover:bg-yellow-500/10 hover:border-yellow-500 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)]'} transition-all duration-300`}
                 >
                     <Sparkles size={16} className="text-yellow-500 animate-pulse"/>
                     <span className="text-xs font-bold text-yellow-500 tracking-wide uppercase">{isGenerating ? 'Generando...' : 'Generar Batería IA'}</span>
@@ -136,12 +136,12 @@ export const Browser: React.FC<BrowserProps> = ({ mode, onImport, onLoadSession,
 
        {/* CLOUD TAB */}
        {activeTab === 'CLOUD' && (
-           <div className="flex-1 overflow-y-auto p-4 space-y-2">
+           <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#121212]">
                {sessions.length === 0 ? (
                    <div className="text-center mt-10 opacity-30 text-xs">No hay proyectos guardados.</div>
                ) : (
                    sessions.map(s => (
-                       <div key={s.id} onClick={() => onLoadSession && onLoadSession(s)} className="p-3 rounded-lg border border-gray-700 bg-[#252525] cursor-pointer hover:bg-[#303030] hover:border-gray-500 transition-all group">
+                       <div key={s.id} onClick={() => onLoadSession && onLoadSession(s)} className="p-3 rounded-lg border border-white/5 bg-[#1f1f22] cursor-pointer hover:bg-[#27272a] hover:border-cyan-500/50 transition-all group">
                            <div className="flex justify-between items-start">
                                <div>
                                    <div className="font-bold text-sm truncate w-40 text-gray-200">{s.name}</div>

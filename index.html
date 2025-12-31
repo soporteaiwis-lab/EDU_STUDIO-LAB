@@ -2,53 +2,48 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EduStudio Pro | AIWIS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>EduStudio Lab | AIWIS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&family=Nunito:wght@400;600;700;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg-dark: #0f172a;
-        --bg-panel: #1e293b;
+        --bg-dark: #09090b;
+        --bg-panel: #18181b;
         --accent: #8b5cf6;
-        --text-primary: #f8fafc;
-        --text-secondary: #94a3b8;
+        --neon-blue: #06b6d4;
+        --neon-pink: #f43f5e;
       }
       body {
         font-family: 'Nunito', sans-serif;
         background-color: var(--bg-dark);
-        color: var(--text-primary);
-        overflow: hidden; /* App-like feel */
-      }
-      h1, h2, h3, h4, button, .font-display {
-        font-family: 'Fredoka', sans-serif;
+        color: #f8fafc;
+        overflow: hidden; /* Critical for App-feel */
+        height: 100vh;
+        width: 100vw;
       }
       
-      /* New "Armonia" Pro Background */
+      /* Logo Font */
+      .font-logo { font-family: 'Orbitron', sans-serif; }
+      .font-display { font-family: 'Fredoka', sans-serif; }
+      
+      /* Professional Dark Gradient Background */
       .bg-studio-dark {
-        background: radial-gradient(circle at top right, #312e81 0%, #1e1b4b 40%, #000000 100%);
-        background-attachment: fixed;
+        background: linear-gradient(135deg, #050505 0%, #0f172a 100%);
       }
 
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-        background: #0f172a;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #334155;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #475569;
-      }
+      /* Custom Thin Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #000000; }
+      ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #555; }
 
       /* Animations */
-      .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-      .animate-slide-up { animation: slideUp 0.4s ease-out; }
-      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+      @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      
+      .animate-glow { animation: glow 2s ease-in-out infinite alternate; }
+      @keyframes glow { from { box-shadow: 0 0 5px #06b6d4, 0 0 10px #06b6d4; } to { box-shadow: 0 0 10px #8b5cf6, 0 0 20px #8b5cf6; } }
     </style>
   <script type="importmap">
 {
@@ -63,7 +58,7 @@
 }
 </script>
 </head>
-  <body class="bg-studio-dark">
-    <div id="root"></div>
+  <body class="bg-studio-dark text-white">
+    <div id="root" class="h-full w-full"></div>
   </body>
 </html>

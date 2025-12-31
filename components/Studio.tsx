@@ -11,7 +11,7 @@ import { PianoRollEditor } from './PianoRollEditor';
 import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
 import { Track, UserMode, SongMetadata, MidiNote, AudioDevice, LoopRegion } from '../types';
-import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown } from 'lucide-react';
+import { Play, Square, Sparkles, Home, SkipBack, Circle, PanelBottom, BookOpen, Pause, Grid, Save, SkipForward, FastForward, Rewind, Plus, Settings, Zap, Music, FileAudio, Keyboard as KeyboardIcon, ChevronLeft, ChevronRight, Mic, MoreVertical, Volume2, Magnet, ZoomIn, ZoomOut, Repeat, ChevronDown, Library, Layers, Box } from 'lucide-react';
 
 interface StudioProps {
   userMode: UserMode;
@@ -20,7 +20,7 @@ interface StudioProps {
 
 const INITIAL_TRACKS: Track[] = [
   { 
-    id: '1', name: 'Batería Demo', type: 'DRUMS', instrument: 'DRUMS', color: 'bg-rose-500', 
+    id: '1', name: 'Batería Demo', type: 'DRUMS', instrument: 'DRUMS', color: 'bg-rose-600', 
     volume: 80, pan: 0, eq: { low: 0, mid: 0, high: 0 }, 
     effects: { reverb: 0, pitch: 0, distortion: 0 },
     isMuted: false, isSolo: false, isArmed: false 
@@ -36,7 +36,7 @@ const INITIAL_METADATA: SongMetadata = {
     lyrics: ''
 };
 
-const HEADER_WIDTH = 256; 
+const HEADER_WIDTH = 260; 
 
 export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
@@ -53,7 +53,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   // STUDIO SETTINGS STATE
   const [zoom, setZoom] = useState(1);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [loopRegion, setLoopRegion] = useState<LoopRegion>({ startBar: 0, endBar: 4, isActive: false });
+  const [loopRegion, setLoopRegion] = useState<LoopRegion>({ startBar: 1, endBar: 5, isActive: true });
 
   // Metronome Settings State
   const [showMetronomeSettings, setShowMetronomeSettings] = useState(false);
@@ -69,7 +69,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
 
   const [showMixer, setShowMixer] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
-  const [showBrowser, setShowBrowser] = useState(true);
+  const [showBrowser, setShowBrowser] = useState(true); // Default OPEN
   const [showSongbook, setShowSongbook] = useState(false);
   const [showCreative, setShowCreative] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -272,7 +272,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
           type: type, 
           instrument: type==='AUDIO'?'VOCAL': type==='SAMPLER'?'SAMPLER':'KEYS', 
           midiInstrument: 'GRAND_PIANO',
-          color: 'bg-gray-500', 
+          color: 'bg-gray-600', 
           volume: 80, pan: 0, eq:{low:0,mid:0,high:0}, effects:{reverb:0,pitch:0,distortion:0}, 
           isMuted:false, isSolo:false, isArmed:false 
       };
@@ -292,7 +292,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
       const newT: Track = { 
           id, name, type: trackType === 'MIDI' ? 'MIDI' : trackType, 
           instrument: trackType==='SAMPLER'?'SAMPLER': trackType === 'MIDI' ? 'KEYS' : 'VOCAL', 
-          color: 'bg-green-500', 
+          color: 'bg-emerald-600', 
           volume: 80, pan: 0, eq:{low:0,mid:0,high:0}, effects:{reverb:0,pitch:0,distortion:0}, 
           isMuted:false, isSolo:false, isArmed:false, 
           audioUrl: trackType==='AUDIO'?url:undefined, samplerUrl: trackType==='SAMPLER'?url:undefined
@@ -308,7 +308,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   const gridLines = useMemo(() => {
     const lines = [];
     const pixelsPerBar = (60 / bpm) * 4 * (40 * zoom);
-    // Draw 100 bars
+    // LIMIT TIMELINE: Draw only 100 bars to prevent infinite scrolling madness
     for(let i=0; i<100; i++) {
         lines.push(
             <div key={`bar-${i}`} className="absolute top-0 bottom-0 w-px border-l border-white/5 pointer-events-none" style={{left: `${HEADER_WIDTH + (i * pixelsPerBar)}px`}}></div>
@@ -323,170 +323,139 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
     return lines;
   }, [bpm, zoom]);
 
+  // Total width of the track area (100 bars)
+  const totalTrackWidth = HEADER_WIDTH + (100 * (60 / bpm) * 4 * (40 * zoom));
+
   return (
-    <div className="flex flex-col h-screen bg-studio-dark font-nunito select-none overflow-hidden relative text-gray-200">
+    <div className="flex flex-col h-screen w-screen bg-studio-dark font-nunito select-none overflow-hidden text-gray-200">
         
-        {/* TOP BAR / TRANSPORT (Visual overhaul to "Armonia" style) */}
+        {/* TOP BAR / TRANSPORT */}
         <div className="h-16 flex-shrink-0 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between z-50">
              
-             {/* Left Controls */}
-             <div className="flex items-center space-x-3">
-                 <button onClick={onExit} className="text-gray-400 hover:text-white mr-4"><Home size={18}/></button>
-                 <button onClick={handleSettingsOpen} className="p-2 text-gray-400 hover:text-white" title="Configuración de Audio/MIDI"><Settings size={18}/></button>
+             {/* Left: LOGO & EXIT */}
+             <div className="flex items-center space-x-4">
+                 <button onClick={onExit} className="text-gray-400 hover:text-white"><Home size={20}/></button>
                  
+                 {/* BRAND LOGO */}
+                 <div className="flex items-center space-x-2 select-none group">
+                     <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded flex items-center justify-center shadow-lg group-hover:animate-glow transition-all">
+                        <Box size={20} className="text-white"/>
+                     </div>
+                     <div className="flex flex-col leading-none">
+                         <span className="font-logo font-black text-lg tracking-wider text-white">EDU<span className="text-cyan-400">STUDIO</span></span>
+                         <span className="text-[9px] font-bold text-gray-500 tracking-[0.2em] uppercase">Lab Edition</span>
+                     </div>
+                 </div>
+
                  <div className="w-px h-6 bg-white/10 mx-2"></div>
 
-                 {/* Transport Buttons */}
-                 <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white transition"><SkipBack size={20}/></button>
-                 <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 transition"><Square size={20}/></button>
+                 {/* Transport */}
+                 <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white transition"><SkipBack size={18}/></button>
+                 <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 transition"><Square size={18}/></button>
                  <button onClick={handlePlayToggle} className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 hover:scale-105 transition shadow-lg border border-white/5">
-                    {isPlaying ? <Pause size={24} fill="white"/> : <Play size={24} fill="white"/>}
+                    {isPlaying ? <Pause size={20} fill="white"/> : <Play size={20} fill="white"/>}
                  </button>
                  <button onClick={handleRecordToggle} className={`p-3 rounded-full transition shadow-lg border border-white/5 ${isRecording ? 'bg-red-600 animate-pulse' : 'bg-white/10 hover:bg-white/20 hover:text-red-500'}`}>
-                    <Circle size={24} fill={isRecording ? "white" : "currentColor"} className={isRecording ? "text-white" : "text-red-500"}/>
+                    <Circle size={20} fill={isRecording ? "white" : "currentColor"} className={isRecording ? "text-white" : "text-red-500"}/>
                  </button>
              </div>
 
              {/* Center Display (LCD LOOK) */}
-             <div className="relative mx-4 flex-1 max-w-lg" ref={metronomeRef}>
-                 <div className="bg-[#111] rounded-lg border border-[#333] p-0.5 flex items-center justify-between shadow-inner h-12 px-2 relative">
+             <div className="relative mx-4 flex-1 max-w-[400px]" ref={metronomeRef}>
+                 <div className="bg-[#0f0f0f] rounded border border-[#222] p-0.5 flex items-center justify-between shadow-inner h-12 px-4 relative">
                      
-                     {/* BPM Section */}
-                     <div className="flex items-center px-3 py-1 cursor-pointer hover:bg-white/5 rounded transition border-r border-[#333] h-full" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
-                         <div className="flex flex-col items-center">
-                             <span className="text-[9px] font-bold text-gray-500 leading-none tracking-wider mb-0.5">BPM</span>
-                             <span className="text-xl font-mono font-bold text-cyan-400 leading-none">{bpm}</span>
-                         </div>
+                     <div className="flex flex-col items-center border-r border-[#222] pr-4 cursor-pointer hover:bg-white/5 h-full justify-center transition" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
+                         <span className="text-[8px] font-bold text-gray-500 tracking-wider">BPM</span>
+                         <span className="text-xl font-mono font-bold text-cyan-400 leading-none">{bpm}</span>
                      </div>
 
-                     {/* Time Sig Section */}
-                     <div className="flex flex-col items-center justify-center px-3 border-r border-[#333] h-full cursor-pointer hover:bg-white/5" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
-                          <span className="text-[9px] font-bold text-gray-500 leading-none mb-0.5">COMPÁS</span>
-                          <span className="text-lg font-mono font-bold text-gray-300 leading-none flex items-center">
-                             {timeSignature} <ChevronDown size={10} className="ml-1 opacity-50"/>
+                     <div className="flex flex-col items-center border-r border-[#222] px-4 h-full justify-center">
+                          <span className="text-[8px] font-bold text-gray-500">COMPÁS</span>
+                          <span className="text-lg font-mono font-bold text-gray-300 leading-none">{timeSignature}</span>
+                     </div>
+
+                     <div className="flex flex-col items-center px-4 h-full justify-center">
+                          <span className="text-[8px] font-bold text-gray-500">TIEMPO</span>
+                          <span className="text-lg font-mono font-bold text-gray-300 leading-none">
+                              {Math.floor(audioService.getCurrentTime()).toString().padStart(2, '0')}:
+                              {(Math.floor(audioService.getCurrentTime() * 100) % 100).toString().padStart(2, '0')}
                           </span>
                      </div>
 
-                     {/* Key Section (Static for now) */}
-                     <div className="flex flex-col items-center justify-center px-3 border-r border-[#333] h-full">
-                          <span className="text-[9px] font-bold text-gray-500 leading-none mb-0.5">TONO</span>
-                          <span className="text-lg font-mono font-bold text-gray-300 leading-none">{metadata.key}</span>
-                     </div>
-
-                     {/* Metronome Toggle */}
                      <button 
                         onClick={() => setMetronomeOn(!metronomeOn)} 
-                        className={`h-8 w-8 ml-2 rounded flex items-center justify-center transition-all ${metronomeOn ? 'bg-cyan-900/40 text-cyan-400 border border-cyan-700' : 'text-gray-600 hover:text-gray-400'}`}
+                        className={`ml-2 p-1.5 rounded transition-all ${metronomeOn ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-600 hover:text-gray-400'}`}
+                        title="Metrónomo On/Off"
                      >
-                        <Settings size={18} className={metronomeOn ? "animate-spin-slow" : ""}/>
+                        <Settings size={16} className={metronomeOn ? "animate-spin-slow" : ""}/>
                      </button>
                  </div>
 
-                  {/* METRONOME POPOVER (Replicating BandLab Style) */}
+                  {/* METRONOME POPOVER */}
                  {showMetronomeSettings && (
-                     <div className="absolute top-14 left-0 right-0 bg-[#1e1e1e] border border-gray-600 rounded-xl shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-4 w-full">
-                         
-                         {/* Tap Tempo */}
-                         <div className="flex justify-between items-center bg-[#111] p-2 rounded-lg border border-gray-700">
-                             <div className="flex flex-col">
-                                 <div className="text-xs font-bold text-gray-400">Pulsa Tempo</div>
-                                 <div className="text-[9px] text-gray-600 uppercase">Tocar repetidamente</div>
-                             </div>
-                             <button 
-                                onClick={handleTapTempo} 
-                                className="bg-[#2a2a2a] hover:bg-[#333] active:scale-95 text-cyan-400 border border-gray-600 rounded-md w-16 h-10 font-mono text-xl font-bold flex items-center justify-center transition-all"
-                             >
-                                 {bpm}
-                             </button>
+                     <div className="absolute top-14 left-0 right-0 bg-[#151515] border border-gray-700 rounded-lg shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-3">
+                         <div className="flex justify-between items-center bg-black/20 p-2 rounded border border-white/5">
+                             <div><div className="text-xs font-bold text-gray-400">Tempo</div><div className="text-[9px] text-gray-600">TAP PARA AJUSTAR</div></div>
+                             <button onClick={handleTapTempo} className="bg-[#222] text-cyan-400 border border-gray-600 rounded w-12 h-8 font-mono font-bold">{bpm}</button>
                          </div>
-                         
-                         <hr className="border-gray-700"/>
-                         
-                         {/* Time Signature */}
-                         <div className="flex justify-between items-center">
-                             <div className="text-xs font-bold text-gray-400">Compás</div>
-                             <select 
-                                value={timeSignature} 
-                                onChange={(e) => setTimeSignature(e.target.value)}
-                                className="bg-[#111] text-white text-xs p-1 rounded border border-gray-700 outline-none"
-                             >
-                                 <option value="4/4">4 / 4</option>
-                                 <option value="3/4">3 / 4</option>
-                                 <option value="6/8">6 / 8</option>
-                             </select>
-                         </div>
-
-                         {/* Sound */}
-                         <div className="flex justify-between items-center">
-                             <div className="text-xs font-bold text-gray-400">Sonido</div>
-                             <select className="bg-[#111] text-white text-xs p-1 rounded border border-gray-700 outline-none w-24">
-                                 <option>Default</option>
-                                 <option>Woodblock</option>
-                                 <option>HiHat</option>
-                             </select>
-                         </div>
-
-                         {/* Count In */}
-                         <div>
-                             <div className="text-xs font-bold text-gray-400 mb-2">Duración de cuenta</div>
-                             <div className="flex bg-[#111] p-1 rounded-lg border border-gray-700">
-                                 <button onClick={() => setCountIn('OFF')} className={`flex-1 py-1 text-[10px] font-bold rounded ${countIn === 'OFF' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>Off</button>
-                                 <button onClick={() => setCountIn('1BAR')} className={`flex-1 py-1 text-[10px] font-bold rounded ${countIn === '1BAR' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>1 compás</button>
-                                 <button onClick={() => setCountIn('2BAR')} className={`flex-1 py-1 text-[10px] font-bold rounded ${countIn === '2BAR' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>2 compases</button>
-                             </div>
-                         </div>
-
-                         {/* Volume */}
-                         <div>
-                             <div className="flex justify-between text-[10px] font-bold text-gray-500 mb-1"><span>Volumen</span><span>{metronomeVolume} dB</span></div>
-                             <div className="flex items-center space-x-2">
-                                <Volume2 size={12} className="text-gray-600"/>
-                                <input type="range" min="-40" max="0" value={metronomeVolume} onChange={(e) => setMetronomeVolume(parseInt(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"/>
-                             </div>
+                         <div className="space-y-1">
+                             <div className="flex justify-between text-[10px] font-bold text-gray-500"><span>Volumen Click</span><span>{metronomeVolume} dB</span></div>
+                             <input type="range" min="-40" max="0" value={metronomeVolume} onChange={(e) => setMetronomeVolume(parseInt(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:bg-cyan-500"/>
                          </div>
                      </div>
                  )}
              </div>
 
-             {/* Right Controls (Grid & Zoom) */}
-             <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
+             {/* Right Controls */}
+             <div className="flex items-center space-x-2 border-l border-white/10 pl-4">
                  
-                 {/* Snap Toggle */}
-                 <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-1.5 rounded transition ${snapEnabled ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Ajustar a la cuadrícula (Snap)">
-                    <Magnet size={18}/>
-                 </button>
+                 {/* Global Tools */}
+                 <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-2 rounded ${snapEnabled ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Snap Grid"><Magnet size={18}/></button>
+                 <button onClick={() => setLoopRegion({...loopRegion, isActive: !loopRegion.isActive})} className={`p-2 rounded ${loopRegion.isActive ? 'text-green-400 bg-green-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Bucle"><Repeat size={18}/></button>
 
-                 {/* Loop Toggle */}
-                 <button 
-                    onClick={() => setLoopRegion({...loopRegion, isActive: !loopRegion.isActive})} 
-                    className={`p-1.5 rounded transition ${loopRegion.isActive ? 'text-green-400 bg-green-900/20' : 'text-gray-500 hover:text-gray-300'}`} 
-                    title="Activar Bucle"
-                 >
-                    <Repeat size={18}/>
-                 </button>
-
-                 {/* Zoom Controls */}
-                 <div className="flex items-center bg-white/5 rounded-lg p-1">
+                 {/* Zoom */}
+                 <div className="flex items-center bg-white/5 rounded p-1 mx-2">
                      <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-1 text-gray-400 hover:text-white"><ZoomOut size={14}/></button>
-                     <span className="text-[10px] font-bold text-gray-500 w-8 text-center">{Math.round(zoom*100)}%</span>
+                     <span className="text-[9px] font-bold text-gray-500 w-8 text-center">{Math.round(zoom*100)}%</span>
                      <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-1 text-gray-400 hover:text-white"><ZoomIn size={14}/></button>
                  </div>
 
-                 <button onClick={() => setShowCreative(true)} className="p-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-md text-xs font-bold flex items-center hover:opacity-90 shadow-lg ml-2">
-                    <Sparkles size={14} className="mr-1"/> AI
+                 {/* Library Toggle (CRITICAL FIX) */}
+                 <button 
+                    onClick={() => setShowBrowser(!showBrowser)} 
+                    className={`p-2 rounded flex items-center space-x-1 transition-colors ${showBrowser ? 'bg-cyan-600 text-white shadow-lg' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
+                 >
+                     <Library size={16}/>
+                     <span className="text-xs font-bold hidden md:inline">Librería</span>
+                 </button>
+
+                 <button onClick={() => setShowCreative(true)} className="p-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded text-xs font-bold flex items-center hover:opacity-90 shadow-lg">
+                    <Sparkles size={16} className="mr-1"/> AI
                  </button>
              </div>
         </div>
 
-        {/* WORKSPACE */}
-        <div className="flex-1 flex overflow-hidden min-h-0 bg-transparent relative">
-            {!isExplorer && showInspector && selectedTrackId && <Inspector track={tracks.find(t => t.id === selectedTrackId)} mode={userMode} onUpdate={(id, up) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t))} onClose={() => setSelectedTrackId(null)} />}
+        {/* WORKSPACE AREA (FLEX LAYOUT FIX) */}
+        <div className="flex-1 flex overflow-hidden bg-transparent relative w-full">
             
-            <div className="flex-1 flex flex-col min-w-0 relative h-full">
-                <div ref={timelineContainerRef} className="flex-1 overflow-auto relative scroll-smooth bg-transparent" onMouseDown={(e) => { if(e.target === timelineContainerRef.current) handleSeek(e); }}>
+            {/* LEFT: INSPECTOR (Optional) */}
+            {!isExplorer && showInspector && selectedTrackId && (
+                <Inspector 
+                    track={tracks.find(t => t.id === selectedTrackId)} 
+                    mode={userMode} 
+                    onUpdate={(id, up) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t))} 
+                    onClose={() => setSelectedTrackId(null)} 
+                />
+            )}
+            
+            {/* CENTER: TIMELINE (Scrollable) */}
+            <div className="flex-1 flex flex-col min-w-0 relative h-full bg-[#121212]">
+                
+                {/* Scrollable Container */}
+                <div ref={timelineContainerRef} className="flex-1 overflow-auto relative scroll-smooth bg-transparent custom-scrollbar">
                      
-                     {/* TIMELINE RULER */}
-                     <div className="sticky top-0 z-30 w-fit">
+                     {/* Sticky Ruler */}
+                     <div className="sticky top-0 z-30 w-fit bg-[#121212]">
                         <TimelineRuler 
                             mode={userMode} 
                             bpm={bpm} 
@@ -497,14 +466,29 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                         />
                      </div>
 
-                     <div className="relative min-w-max pb-32">
+                     {/* Tracks Container (Fixed Width based on length) */}
+                     <div className="relative pb-32" style={{ width: `${totalTrackWidth}px`, minWidth: '100%' }}>
+                         
                          {/* Global Grid Lines */}
-                         <div className="absolute top-0 left-0 min-w-full h-full pointer-events-none z-0">{gridLines}</div>
+                         <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">{gridLines}</div>
                          
                          {/* Playhead */}
                          <div ref={playheadRef} className="absolute top-0 bottom-0 w-[2px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}>
-                             <div className="w-4 h-4 -ml-[7px] bg-cyan-400 transform rotate-45 -mt-2 shadow-md"></div>
+                             <div className="w-4 h-4 -ml-[7px] bg-cyan-400 transform rotate-45 -mt-2 shadow-md flex items-center justify-center">
+                                 <div className="w-1 h-1 bg-white rounded-full"></div>
+                             </div>
                          </div>
+
+                         {/* Loop Visualizer Overlay (If active) */}
+                         {loopRegion.isActive && (
+                             <div 
+                                className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0"
+                                style={{ 
+                                    left: HEADER_WIDTH + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), 
+                                    width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom 
+                                }}
+                             ></div>
+                         )}
 
                          {/* Tracks */}
                          <div className="relative z-10 pt-1">
@@ -533,7 +517,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                      </div>
                 </div>
                 
-                {/* MIXER */}
+                {/* MIXER (Bottom) */}
                 {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative animate-slide-up border-t border-black"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
                 
                 {/* PIANO PANEL */}
@@ -552,12 +536,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 )}
             </div>
 
-            {/* Right Side Panels */}
+            {/* RIGHT: BROWSER & SONGBOOK */}
             {showBrowser && <Browser mode={userMode} onImport={(u,n,t)=>setPendingImport({url:u,name:n})} onLoadSession={(s)=>{handleStop();setSessionId(s.id);setSessionName(s.name);setBpm(s.bpm);setTracks(s.tracks);if(s.metadata)setMetadata(s.metadata);setShowBrowser(false);}} onClose={() => setShowBrowser(false)} />}
             {showSongbook && <SongbookPanel mode={userMode} metadata={metadata} onUpdateLyrics={(text) => setMetadata(prev=>({...prev, lyrics: text}))} onClose={() => setShowSongbook(false)} />}
         </div>
         
-        {/* SETTINGS MODAL */}
+        {/* MODALS */}
         {showSettings && (
             <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
                 <div className="bg-[#1e1e1e] border border-gray-700 p-6 rounded-2xl w-96 text-gray-200 shadow-2xl">
@@ -569,7 +553,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                                 <button key={d.deviceId} onClick={() => handleDeviceSelect(d.deviceId)} className="w-full text-left p-2 bg-black/20 hover:bg-black/40 rounded flex items-center transition-colors">
                                     <Mic size={14} className="mr-2 text-green-500"/> <span className="text-sm truncate">{d.label}</span>
                                 </button>
-                            )) : <div className="text-sm text-red-400">No se detectaron dispositivos. Revisa los permisos.</div>}
+                            )) : <div className="text-sm text-red-400">No se detectaron dispositivos.</div>}
                         </div>
                     </div>
                     <div className="mt-6 flex justify-end">
@@ -579,7 +563,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
             </div>
         )}
 
-        {/* ... (Existing modals for import and creative kept same but styling updated implicitly by theme) ... */}
         {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={(t)=>setMetadata(p=>({...p,lyrics:t}))} onImportChords={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Acordes ${d.key}`,type:'CHORD',instrument:'CHORD',color:'bg-blue-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,chordData:d.progression}]);audioService.addTrack(id,'','INSTRUMENT');}} onImportRhythm={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Batería ${d.style}`,type:'RHYTHM',instrument:'DRUMS',color:'bg-red-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,rhythmData:d.events}]);audioService.addTrack(id,'','DRUMS');}} onImportMelody={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Melodía ${d.key}`,type:'MELODY',instrument:'KEYS',color:'bg-yellow-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,melodyData:d.events}]);audioService.addTrack(id,'','INSTRUMENT');}} />}
         {pendingImport && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]"><div className="bg-[#1e1e1e] p-6 rounded-2xl shadow-2xl w-96 animate-slide-up border border-white/10"><h3 className="text-xl font-bold mb-2 text-white">Importar Archivo</h3><p className="text-sm text-gray-400 mb-4 break-all">"{pendingImport.name}"</p><div className="space-y-3"><button onClick={() => confirmImport('AUDIO')} className="w-full p-3 bg-blue-900/30 hover:bg-blue-900/50 rounded-xl flex items-center font-bold text-blue-300 border border-blue-500/30"><div className="bg-blue-600 text-white p-2 rounded-full mr-3"><FileAudio size={18}/></div><div><div className="text-sm">Pista de Audio</div></div></button><button onClick={() => confirmImport('MIDI')} className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center font-bold text-gray-300 border border-gray-600"><div className="bg-gray-600 text-white p-2 rounded-full mr-3"><Music size={18}/></div><div><div className="text-sm">Pista MIDI</div></div></button></div><button onClick={() => setPendingImport(null)} className="mt-4 text-gray-500 text-xs hover:text-white font-bold block mx-auto uppercase">Cancelar</button></div></div>}
         {importModal && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"><div className="bg-[#1e1e1e] p-6 rounded-2xl shadow-xl w-96 border border-white/10"><h3 className="text-xl font-bold mb-4 text-white">Crear Nueva Pista</h3><div className="space-y-3"><button onClick={() => addTrack('AUDIO')} className="w-full p-4 bg-blue-900/30 hover:bg-blue-900/50 rounded-xl flex items-center font-bold text-blue-300 border border-blue-500/30"><div className="bg-blue-600 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>Audio / Voz (Mic)</button><button onClick={() => addTrack('MIDI')} className="w-full p-4 bg-orange-900/30 hover:bg-orange-900/50 rounded-xl flex items-center font-bold text-orange-300 border border-orange-500/30"><div className="bg-orange-600 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>Instrumento Virtual (MIDI)</button></div><button onClick={() => setImportModal(false)} className="mt-4 text-gray-500 text-sm hover:text-white font-bold block mx-auto">Cancelar</button></div></div>}
