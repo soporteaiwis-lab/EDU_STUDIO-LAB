@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -5,45 +6,68 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>EduStudio Lab | AIWIS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&family=Nunito:wght@400;600;700;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&family=Nunito:wght@400;600;700;800&family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg-dark: #09090b;
-        --bg-panel: #18181b;
-        --accent: #8b5cf6;
-        --neon-blue: #06b6d4;
-        --neon-pink: #f43f5e;
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-bg: rgba(20, 20, 25, 0.7);
+        --neon-primary: #8b5cf6;
+        --neon-secondary: #06b6d4;
       }
       body {
         font-family: 'Nunito', sans-serif;
-        background-color: var(--bg-dark);
+        background-color: #050505;
         color: #f8fafc;
-        overflow: hidden; /* Critical for App-feel */
+        overflow: hidden; 
         height: 100vh;
         width: 100vw;
       }
       
-      /* Logo Font */
-      .font-logo { font-family: 'Orbitron', sans-serif; }
+      /* New Branding Font */
+      .font-brand { font-family: 'Outfit', sans-serif; }
       .font-display { font-family: 'Fredoka', sans-serif; }
       
-      /* Professional Dark Gradient Background */
-      .bg-studio-dark {
-        background: linear-gradient(135deg, #050505 0%, #0f172a 100%);
+      /* Artistic Backgrounds */
+      .bg-artistic {
+        background: radial-gradient(circle at 10% 20%, rgb(30, 0, 50) 0%, rgb(0, 0, 0) 90%);
       }
 
-      /* Custom Thin Scrollbar */
+      /* Custom Scrollbar */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: #000000; }
-      ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: #555; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
 
       /* Animations */
-      .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-      @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      .animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       
-      .animate-glow { animation: glow 2s ease-in-out infinite alternate; }
-      @keyframes glow { from { box-shadow: 0 0 5px #06b6d4, 0 0 10px #06b6d4; } to { box-shadow: 0 0 10px #8b5cf6, 0 0 20px #8b5cf6; } }
+      .animate-float { animation: float 6s ease-in-out infinite; }
+      @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+
+      .animate-pulse-slow { animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+      /* Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      }
+      
+      .glass-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+      }
+      .glass-card:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-5px);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 10px 40px -10px rgba(139, 92, 246, 0.3);
+      }
     </style>
   <script type="importmap">
 {
@@ -58,7 +82,7 @@
 }
 </script>
 </head>
-  <body class="bg-studio-dark text-white">
+  <body class="bg-black text-white selection:bg-purple-500 selection:text-white">
     <div id="root" class="h-full w-full"></div>
   </body>
 </html>

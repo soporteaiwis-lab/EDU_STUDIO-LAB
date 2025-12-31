@@ -317,7 +317,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
           type: type, 
           instrument: type==='AUDIO'?'VOCAL': type==='SAMPLER'?'SAMPLER':'KEYS', 
           midiInstrument: 'GRAND_PIANO',
-          color: 'bg-gray-600', 
+          color: 'bg-rose-600', 
           volume: 80, pan: 0, eq:{low:0,mid:0,high:0}, effects:{reverb:0,pitch:0,distortion:0}, 
           isMuted:false, isSolo:false, isArmed:false 
       };
@@ -384,38 +384,38 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-studio-dark font-nunito select-none overflow-hidden text-gray-200 relative">
+    <div className="flex flex-col h-full w-full bg-[#0a0a0a] font-nunito select-none overflow-hidden text-gray-200 relative">
         
         {/* TOP BAR / TRANSPORT */}
-        <div className="h-16 flex-shrink-0 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between z-50">
+        <div className="h-16 flex-shrink-0 bg-[#0f0f13] border-b border-white/5 flex items-center px-4 justify-between z-50 shadow-md">
              
              {/* Left: LOGO & EXIT */}
              <div className="flex items-center space-x-4">
-                 <button onClick={onExit} className="text-gray-400 hover:text-white"><Home size={20}/></button>
+                 <button onClick={onExit} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors"><Home size={20}/></button>
                  
-                 <div className="flex items-center space-x-2 select-none group">
-                     <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded flex items-center justify-center shadow-lg group-hover:animate-glow transition-all">
-                        <Box size={20} className="text-white"/>
+                 <div className="flex items-center gap-3 select-none">
+                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-900/40">
+                        <Box size={18} className="text-white"/>
                      </div>
                      <div className="flex flex-col leading-none">
-                         <span className="font-logo font-black text-lg tracking-wider text-white">EDU<span className="text-cyan-400">STUDIO</span></span>
-                         <span className="text-[9px] font-bold text-gray-500 tracking-[0.2em] uppercase">Lab Edition</span>
+                         <span className="font-brand font-black text-lg tracking-tight text-white">EDU<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">STUDIO</span></span>
+                         <span className="text-[9px] font-bold text-gray-500 tracking-[0.2em] uppercase">Creative Lab</span>
                      </div>
                  </div>
 
-                 <div className="w-px h-6 bg-white/10 mx-2"></div>
+                 <div className="w-px h-8 bg-white/5 mx-4"></div>
 
                  {/* TRANSPORT CONTROLS */}
-                 <div className="flex items-center bg-[#18181b] rounded-full p-1 border border-white/5 ml-2 shadow-inner">
+                 <div className="flex items-center bg-black/40 rounded-full p-1.5 border border-white/5 shadow-inner">
                      <button onClick={handleSeekStart} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Ir al Inicio"><SkipBack size={16}/></button>
                      <button onClick={handleRewind} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition" title="Retroceder 10s"><Rewind size={16}/></button>
                      <button onClick={handleStop} className="p-2 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-full transition" title="Detener"><Square size={16}/></button>
                      
-                     <button onClick={handlePlayToggle} className="mx-2 p-3 bg-cyan-600 rounded-full text-white hover:bg-cyan-500 hover:scale-105 transition shadow-lg border border-cyan-400">
+                     <button onClick={handlePlayToggle} className="mx-2 p-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full text-white hover:scale-105 transition shadow-lg shadow-cyan-900/30 active:scale-95">
                         {isPlaying ? <Pause size={20} fill="white"/> : <Play size={20} fill="white"/>}
                      </button>
                      
-                     <button onClick={handleRecordToggle} className={`mr-2 p-3 rounded-full transition shadow-lg border ${isRecording ? 'bg-red-600 border-red-400 animate-pulse' : 'bg-[#2a2a2a] border-gray-700 hover:bg-[#333] hover:text-red-500'}`} title="Grabar">
+                     <button onClick={handleRecordToggle} className={`mr-2 p-3 rounded-full transition shadow-lg border ${isRecording ? 'bg-red-600 border-red-500 animate-pulse shadow-red-900/50' : 'bg-black/20 border-white/5 hover:bg-white/10 text-red-500'}`} title="Grabar">
                         <Circle size={20} fill={isRecording ? "white" : "currentColor"} className={isRecording ? "text-white" : "text-red-500"}/>
                      </button>
                      
@@ -426,29 +426,29 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
 
              {/* Center Display (LCD) */}
              <div className="relative mx-4 flex-1 max-w-[400px]" ref={metronomeRef}>
-                 <div className="bg-[#0f0f0f] rounded border border-[#222] p-0.5 flex items-center justify-between shadow-inner h-12 px-4 relative">
-                     <div className="flex flex-col items-center border-r border-[#222] pr-4 cursor-pointer hover:bg-white/5 h-full justify-center transition" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
-                         <span className="text-[8px] font-bold text-gray-500 tracking-wider">BPM</span>
+                 <div className="bg-[#050505] rounded-xl border border-white/10 p-1 flex items-center justify-between shadow-inner h-14 px-6 relative">
+                     <div className="flex flex-col items-center border-r border-white/5 pr-6 cursor-pointer hover:bg-white/5 h-full justify-center transition rounded-l-lg" onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}>
+                         <span className="text-[9px] font-bold text-gray-500 tracking-wider">BPM</span>
                          <span className="text-xl font-mono font-bold text-cyan-400 leading-none">{bpm}</span>
                      </div>
-                     <div className="flex flex-col items-center border-r border-[#222] px-4 h-full justify-center">
-                          <span className="text-[8px] font-bold text-gray-500">COMPÁS</span>
+                     <div className="flex flex-col items-center border-r border-white/5 px-6 h-full justify-center">
+                          <span className="text-[9px] font-bold text-gray-500">COMPÁS</span>
                           <span className="text-lg font-mono font-bold text-gray-300 leading-none">{timeSignature}</span>
                      </div>
-                     <div className="flex flex-col items-center px-4 h-full justify-center">
-                          <span className="text-[8px] font-bold text-gray-500">TIEMPO</span>
+                     <div className="flex flex-col items-center px-6 h-full justify-center">
+                          <span className="text-[9px] font-bold text-gray-500">TIEMPO</span>
                           <span className="text-lg font-mono font-bold text-gray-300 leading-none">
                               {Math.floor(audioService.getCurrentTime()).toString().padStart(2, '0')}:
                               {(Math.floor(audioService.getCurrentTime() * 100) % 100).toString().padStart(2, '0')}
                           </span>
                      </div>
-                     <button onClick={() => setMetronomeOn(!metronomeOn)} className={`ml-2 p-1.5 rounded transition-all ${metronomeOn ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-600 hover:text-gray-400'}`}>
+                     <button onClick={() => setMetronomeOn(!metronomeOn)} className={`absolute right-2 p-1.5 rounded-lg transition-all ${metronomeOn ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-600 hover:text-gray-400'}`}>
                         <Settings size={16} className={metronomeOn ? "animate-spin-slow" : ""}/>
                      </button>
                  </div>
                  {showMetronomeSettings && (
-                     <div className="absolute top-14 left-0 right-0 bg-[#151515] border border-gray-700 rounded-lg shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-3">
-                         <div className="flex justify-between items-center bg-black/20 p-2 rounded border border-white/5">
+                     <div className="absolute top-16 left-0 right-0 bg-[#151515] border border-white/10 rounded-xl shadow-2xl p-4 z-[100] animate-slide-up flex flex-col space-y-3 glass-panel">
+                         <div className="flex justify-between items-center bg-black/40 p-2 rounded-lg border border-white/5">
                              <div><div className="text-xs font-bold text-gray-400">Tempo</div><div className="text-[9px] text-gray-600">TAP PARA AJUSTAR</div></div>
                              <button onClick={handleTapTempo} className="bg-[#222] text-cyan-400 border border-gray-600 rounded w-12 h-8 font-mono font-bold">{bpm}</button>
                          </div>
@@ -461,24 +461,24 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
              </div>
 
              {/* Right Controls */}
-             <div className="flex items-center space-x-2 border-l border-white/10 pl-4">
+             <div className="flex items-center space-x-2 border-l border-white/5 pl-4">
                  
-                 <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-2 rounded ${snapEnabled ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Snap Grid"><Magnet size={18}/></button>
-                 <button onClick={() => setLoopRegion({...loopRegion, isActive: !loopRegion.isActive})} className={`p-2 rounded ${loopRegion.isActive ? 'text-green-400 bg-green-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Bucle"><Repeat size={18}/></button>
+                 <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-2 rounded-lg transition-colors ${snapEnabled ? 'text-cyan-400 bg-cyan-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Snap Grid"><Magnet size={18}/></button>
+                 <button onClick={() => setLoopRegion({...loopRegion, isActive: !loopRegion.isActive})} className={`p-2 rounded-lg transition-colors ${loopRegion.isActive ? 'text-green-400 bg-green-900/20' : 'text-gray-500 hover:text-gray-300'}`} title="Bucle"><Repeat size={18}/></button>
 
                  {/* ZOOM CONTROLS WITH FIT BUTTON */}
-                 <div className="flex items-center bg-white/5 rounded p-1 mx-2">
-                     <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-1 text-gray-400 hover:text-white"><ZoomOut size={14}/></button>
-                     <button onClick={handleFitToScreen} className="p-1 text-cyan-400 hover:text-white font-bold text-[10px] w-12 text-center" title="Ajustar a Pantalla">FIT</button>
-                     <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-1 text-gray-400 hover:text-white"><ZoomIn size={14}/></button>
+                 <div className="flex items-center bg-white/5 rounded-lg p-1 mx-2">
+                     <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-1.5 text-gray-400 hover:text-white rounded"><ZoomOut size={14}/></button>
+                     <button onClick={handleFitToScreen} className="px-2 py-1 text-cyan-400 hover:text-white font-bold text-[10px] text-center rounded hover:bg-white/10 transition-colors" title="Ajustar a Pantalla">FIT</button>
+                     <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-1.5 text-gray-400 hover:text-white rounded"><ZoomIn size={14}/></button>
                  </div>
 
-                 <button onClick={() => setShowBrowser(!showBrowser)} className={`p-2 rounded flex items-center space-x-1 transition-colors ${showBrowser ? 'bg-cyan-600 text-white shadow-lg' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>
+                 <button onClick={() => setShowBrowser(!showBrowser)} className={`p-2 rounded-lg flex items-center space-x-2 transition-all ${showBrowser ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/40' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
                      <Library size={16}/>
                      <span className="text-xs font-bold hidden md:inline">Librería</span>
                  </button>
 
-                 <button onClick={() => setShowCreative(true)} className="p-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded text-xs font-bold flex items-center hover:opacity-90 shadow-lg">
+                 <button onClick={() => setShowCreative(true)} className="p-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-lg text-xs font-bold flex items-center hover:brightness-110 shadow-lg shadow-fuchsia-900/40 transition-all">
                     <Sparkles size={16} className="mr-1"/> AI
                  </button>
              </div>
@@ -490,25 +490,25 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                 <Inspector track={tracks.find(t => t.id === selectedTrackId)} mode={userMode} onUpdate={(id, up) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t))} onClose={() => setSelectedTrackId(null)} />
             )}
             
-            <div className="flex-1 flex flex-col min-w-0 relative h-full bg-[#121212]">
-                <div ref={timelineContainerRef} className="flex-1 overflow-auto relative scroll-smooth bg-transparent custom-scrollbar">
-                     <div className="sticky top-0 z-30 w-fit bg-[#121212]">
+            <div className="flex-1 flex flex-col min-w-0 relative h-full bg-[#080808]">
+                <div ref={timelineContainerRef} className="flex-1 overflow-auto relative scroll-smooth bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] custom-scrollbar">
+                     <div className="sticky top-0 z-30 w-fit bg-[#080808]">
                         <TimelineRuler mode={userMode} bpm={bpm} zoom={zoom} paddingLeft={HEADER_WIDTH} loopRegion={loopRegion} onLoopChange={setLoopRegion} totalBars={totalBars} />
                      </div>
 
                      {/* Tracks Container with Dynamic Width */}
                      <div className="relative pb-32" style={{ width: `${totalTrackWidth}px`, minWidth: '100%' }}>
                          <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">{gridLines}</div>
-                         <div ref={playheadRef} className="absolute top-0 bottom-0 w-[2px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}>
-                             <div className="w-4 h-4 -ml-[7px] bg-cyan-400 transform rotate-45 -mt-2 shadow-md flex items-center justify-center">
-                                 <div className="w-1 h-1 bg-white rounded-full"></div>
+                         <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}>
+                             <div className="w-5 h-5 -ml-[9px] bg-cyan-400 transform rotate-45 -mt-2.5 shadow-md flex items-center justify-center border border-white">
+                                 <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                              </div>
                          </div>
                          {loopRegion.isActive && (
                              <div className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0" style={{ left: HEADER_WIDTH + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom }}></div>
                          )}
 
-                         <div className="relative z-10 pt-1">
+                         <div className="relative z-10 pt-2 space-y-1">
                             {tracks.map(track => (
                                 <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom}
                                     onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
@@ -524,12 +524,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                          </div>
 
                          <div className="mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: HEADER_WIDTH }}>
-                             <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-white/5 transition-all"><Plus size={16} className="mr-2"/> Nueva Pista</button>
+                             <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-dashed border-white/10 hover:border-white/30 transition-all"><Plus size={16} className="mr-2"/> Nueva Pista</button>
                         </div>
                      </div>
                 </div>
                 
-                {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative animate-slide-up border-t border-black"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
+                {showMixer && !isExplorer && <div className="h-64 flex-shrink-0 z-50 relative animate-slide-up border-t border-black bg-[#121212]"><Mixer tracks={tracks} mode={userMode} onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} onEQChange={(id, b, v) => {const t=tracks.find(x=>x.id===id); if(t){const n={...t.eq, [b]:v}; setTracks(prev=>prev.map(x=>x.id===id?{...x, eq:n}:x)); audioService.setEQ(id, n.low, n.mid, n.high);}}} onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} onClose={() => setShowMixer(false)} /></div>}
                 
                 {showPianoPanel && <PianoPanel currentInstrument={selectedTrack.midiInstrument} onClose={() => setSelectedTrackId(null)} />}
 
@@ -544,19 +544,19 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
         {/* AI PRODUCER BUBBLE (FUN & INTERACTIVE) */}
         {showProducer && producerAdvice && (
             <div className="fixed bottom-24 right-8 z-[100] animate-bounce-in max-w-sm">
-                <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-1 rounded-2xl shadow-2xl">
-                    <div className="bg-[#1e1e1e] rounded-xl p-4 relative">
+                <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-[1px] rounded-2xl shadow-2xl">
+                    <div className="bg-black/90 backdrop-blur-xl rounded-2xl p-4 relative border border-white/10">
                          {/* Close X */}
                          <button onClick={() => setShowProducer(false)} className="absolute top-2 right-2 text-gray-500 hover:text-white"><Bot size={14}/></button>
                          <div className="flex items-start space-x-3">
-                             <div className="bg-violet-500/20 p-2 rounded-full">
+                             <div className="bg-violet-500/20 p-2 rounded-full border border-violet-500/30">
                                  <Bot size={24} className="text-violet-300"/>
                              </div>
                              <div>
                                  <h4 className="font-bold text-violet-300 text-sm mb-1">AI Producer dice:</h4>
                                  <p className="text-gray-300 text-sm leading-tight">{producerAdvice.message}</p>
                                  {producerAdvice.actionType !== 'NONE' && (
-                                     <button onClick={applyProducerAdvice} className="mt-3 text-xs bg-violet-600 hover:bg-violet-500 text-white font-bold py-1 px-3 rounded-full transition-colors flex items-center">
+                                     <button onClick={applyProducerAdvice} className="mt-3 text-xs bg-violet-600 hover:bg-violet-500 text-white font-bold py-1.5 px-3 rounded-full transition-colors flex items-center shadow-lg shadow-violet-900/50">
                                          <Sparkles size={10} className="mr-1"/> {producerAdvice.actionLabel || 'Hacer magia'}
                                      </button>
                                  )}
@@ -565,27 +565,27 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onExit }) => {
                     </div>
                 </div>
                 {/* Speech Bubble Tail */}
-                <div className="w-4 h-4 bg-gradient-to-br from-fuchsia-600 to-transparent rotate-45 transform translate-x-8 -translate-y-2"></div>
+                <div className="w-4 h-4 bg-black border-r border-b border-violet-600/50 rotate-45 transform translate-x-8 -translate-y-2.5 z-0"></div>
             </div>
         )}
 
         {/* MODALS */}
         {showSettings && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
-                <div className="bg-[#1e1e1e] border border-gray-700 p-6 rounded-2xl w-96 text-gray-200 shadow-2xl">
-                    <h3 className="text-xl font-bold mb-4 flex items-center"><Settings className="mr-2"/> Configuración de Audio</h3>
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
+                <div className="bg-[#121212] border border-white/10 p-6 rounded-2xl w-96 text-gray-200 shadow-2xl animate-slide-up">
+                    <h3 className="text-xl font-bold mb-4 flex items-center text-white"><Settings className="mr-2 text-cyan-500"/> Configuración de Audio</h3>
                     <div className="mb-4">
                         <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Entrada de Audio (Mic)</label>
                         <div className="space-y-2">
                             {audioDevices.length > 0 ? audioDevices.map(d => (
-                                <button key={d.deviceId} onClick={() => handleDeviceSelect(d.deviceId)} className="w-full text-left p-2 bg-black/20 hover:bg-black/40 rounded flex items-center transition-colors">
+                                <button key={d.deviceId} onClick={() => handleDeviceSelect(d.deviceId)} className="w-full text-left p-3 bg-white/5 hover:bg-white/10 rounded-lg flex items-center transition-colors border border-transparent hover:border-white/10">
                                     <Mic size={14} className="mr-2 text-green-500"/> <span className="text-sm truncate">{d.label}</span>
                                 </button>
-                            )) : <div className="text-sm text-red-400">No se detectaron dispositivos.</div>}
+                            )) : <div className="text-sm text-red-400 p-2 bg-red-900/20 rounded border border-red-900/50">No se detectaron dispositivos.</div>}
                         </div>
                     </div>
                     <div className="mt-6 flex justify-end">
-                        <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 font-bold text-sm text-white">Cerrar</button>
+                        <button onClick={() => setShowSettings(false)} className="px-5 py-2 bg-white/10 rounded-full hover:bg-white/20 font-bold text-sm text-white transition-colors">Cerrar</button>
                     </div>
                 </div>
             </div>
