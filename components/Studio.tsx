@@ -40,6 +40,32 @@ const INITIAL_METADATA: SongMetadata = {
 
 const HEADER_WIDTH = 320; 
 
+const ModeSwitcher = ({ mode, onChange }: { mode: UserMode; onChange: (m: UserMode) => void }) => (
+    <div className="flex bg-white/5 rounded-lg p-1 border border-white/5 mx-2">
+        <button 
+            onClick={() => onChange(UserMode.EXPLORER)} 
+            className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center space-x-1 ${mode === UserMode.EXPLORER ? 'bg-cyan-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            title="Modo Explorador (Didáctico)"
+        >
+            <Baby size={14}/> <span className="hidden xl:inline">EXPLORER</span>
+        </button>
+        <button 
+            onClick={() => onChange(UserMode.MAKER)} 
+            className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center space-x-1 ${mode === UserMode.MAKER ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            title="Modo Maker (Creativo)"
+        >
+            <Hammer size={14}/> <span className="hidden xl:inline">MAKER</span>
+        </button>
+        <button 
+            onClick={() => onChange(UserMode.PRO)} 
+            className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center space-x-1 ${mode === UserMode.PRO ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            title="Modo Pro (DAW Completo)"
+        >
+            <ZapIcon size={14}/> <span className="hidden xl:inline">PRO</span>
+        </button>
+    </div>
+);
+
 export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }) => {
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
   const [metadata, setMetadata] = useState<SongMetadata>(INITIAL_METADATA);
@@ -168,8 +194,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
         const time = audioService.getCurrentTime();
         const pixelsPerSecond = 40 * zoom; 
         playheadRef.current.style.transform = `translateX(${time * pixelsPerSecond}px)`;
-        
-        // Auto-scroll if playing and out of view could be implemented here
       }
       animationRef.current = requestAnimationFrame(animate);
     };
@@ -365,36 +389,6 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
       setShowProducer(false);
   }
 
-  // --- MODE SWITCHER COMPONENT ---
-  const ModeSwitcher = () => (
-      <div className="flex items-center space-x-1 bg-black/40 rounded-lg p-1 border border-white/10 mx-4">
-          <button 
-            onClick={() => onModeChange(UserMode.EXPLORER)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all ${userMode === UserMode.EXPLORER ? 'bg-cyan-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
-            title="Modo Explorador (Básico)"
-          >
-             <Baby size={14}/>
-             <span className="text-xs font-bold hidden xl:inline">Explorador</span>
-          </button>
-          <button 
-            onClick={() => onModeChange(UserMode.MAKER)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all ${userMode === UserMode.MAKER ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
-            title="Modo Creador (Intermedio)"
-          >
-             <Hammer size={14}/>
-             <span className="text-xs font-bold hidden xl:inline">Creador</span>
-          </button>
-          <button 
-            onClick={() => onModeChange(UserMode.PRO)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all ${userMode === UserMode.PRO ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
-            title="Modo Pro (Avanzado)"
-          >
-             <ZapIcon size={14}/>
-             <span className="text-xs font-bold hidden xl:inline">Pro</span>
-          </button>
-      </div>
-  );
-
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0a0a] font-nunito select-none overflow-hidden text-gray-200 relative">
         
@@ -417,7 +411,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
 
                  <div className="w-px h-8 bg-white/5 mx-2 hidden md:block"></div>
                  
-                 <ModeSwitcher />
+                 <ModeSwitcher mode={userMode} onChange={onModeChange} />
 
                  <div className="w-px h-8 bg-white/5 mx-2 hidden md:block"></div>
 
@@ -555,6 +549,13 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                                      {gridLines}
                                  </div>
                                  
+                                 {/* Clickable Seek Area - BEHIND tracks (z-0) */}
+                                 <div 
+                                    className="absolute inset-0 z-0 cursor-crosshair" 
+                                    style={{ left: `${currentHeaderWidth}px` }}
+                                    onClick={handleSeek}
+                                 ></div>
+
                                  {/* Playhead */}
                                  <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: `${currentHeaderWidth}px` }}>
                                      <div className="w-5 h-5 -ml-[9px] bg-cyan-400 transform rotate-45 -mt-2.5 shadow-md flex items-center justify-center border border-white">
@@ -567,33 +568,28 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                                      <div className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0" style={{ left: currentHeaderWidth + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom }}></div>
                                  )}
 
-                                 {/* Tracks List */}
-                                 <div className="relative z-10 pt-4 px-4 space-y-3">
+                                 {/* Tracks List (z-10 to be above seek area) */}
+                                 <div className="relative z-10 pt-4 px-4 space-y-3 pointer-events-none">
                                     {tracks.map(track => (
-                                        <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom} totalWidth={trackContentWidth}
-                                            onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
-                                            onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} 
-                                            onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} 
-                                            onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} 
-                                            onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} 
-                                            onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} 
-                                            onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} 
-                                            onEditMidi={(id) => setEditingMidiTrackId(id)}
-                                        />
+                                        <div key={track.id} className="pointer-events-auto">
+                                            <TrackBlock track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom} totalWidth={trackContentWidth}
+                                                onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
+                                                onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} 
+                                                onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} 
+                                                onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} 
+                                                onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} 
+                                                onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} 
+                                                onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} 
+                                                onEditMidi={(id) => setEditingMidiTrackId(id)}
+                                            />
+                                        </div>
                                     ))}
                                  </div>
 
-                                 {/* Add Track Area */}
-                                 <div className="mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: currentHeaderWidth }}>
-                                     <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-dashed border-white/10 hover:border-white/30 transition-all"><Plus size={16} className="mr-2"/> Nueva Pista</button>
+                                 {/* Add Track Area (z-50 to be always clickable) */}
+                                 <div className="relative z-50 mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: currentHeaderWidth }}>
+                                     <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-dashed border-white/10 hover:border-white/30 transition-all cursor-pointer"><Plus size={16} className="mr-2"/> Nueva Pista</button>
                                 </div>
-                                
-                                {/* Clickable Seek Area Overlay (transparent) */}
-                                <div 
-                                    className="absolute inset-0 z-0 cursor-crosshair" 
-                                    style={{ left: `${currentHeaderWidth}px` }}
-                                    onClick={handleSeek}
-                                ></div>
                              </div>
                          </div>
                      </div>

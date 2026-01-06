@@ -27,22 +27,25 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
   // Calculate Pixels Per Second based on Zoom
   const PIXELS_PER_SECOND = 40 * zoom; 
 
+  // Determine if this is a MIDI-based track (Notes) or Audio-based (Waveform)
+  const isMidiTrack = ['MIDI', 'CHORD', 'MELODY'].includes(track.type);
+
   useEffect(() => {
     const generate = () => {
+       // Only generate waveform for Audio/Sampler types
        if (containerRef.current && (track.type === 'AUDIO' || track.type === 'SAMPLER')) {
           const width = containerRef.current.clientWidth;
-          const height = mode === UserMode.EXPLORER ? 140 : 80; // Taller waveform in Explorer
+          const height = mode === UserMode.EXPLORER ? 140 : 80; 
           const path = audioService.getWaveformPath(track.id, width, height);
           setWaveformPath(path);
        }
     };
-    const interval = setInterval(generate, 500); // Faster refresh for smoother recording visual
+    const interval = setInterval(generate, 500); 
     return () => clearInterval(interval);
   }, [track.id, track.audioUrl, track.samplerUrl, mode, track.type, zoom]);
 
   const getIcon = () => {
     const size = mode === UserMode.EXPLORER ? 40 : 18;
-    // Dynamic color for icon based on track color
     const colorClass = mode === UserMode.EXPLORER 
         ? track.color.replace('bg-', 'text-').replace('600', '600').replace('500', '600') 
         : "text-gray-300";
@@ -71,7 +74,6 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
   // --- CONTENT RENDERERS ---
 
   const renderMidiContent = () => {
-      // Light theme for Explorer MIDI
       const bgClass = mode === UserMode.EXPLORER ? "bg-white" : "bg-[#181818]";
       const gridColor = mode === UserMode.EXPLORER ? "border-gray-100" : "border-white/5";
       const noteColor = mode === UserMode.EXPLORER ? "bg-cyan-500 border-cyan-600" : "bg-cyan-500/80 border-cyan-300";
@@ -85,6 +87,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                   </div>
               ))}
 
+              {/* Render Notes (Handles AI Chords/Melodies too) */}
               {track.midiNotes?.map((note, i) => (
                   <div key={i} className={`absolute ${noteColor} rounded-md shadow-sm border`}
                     style={{
@@ -93,14 +96,15 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                         top: `${Math.max(0, 100 - (note.midi - 36))}px`, 
                         height: '8px'
                     }}
+                    title={`${note.note} (Vel: ${note.velocity})`}
                   />
               ))}
               
-              {/* Botón Editar grande para niños */}
+              {/* Overlay for interaction hint */}
               {mode === UserMode.EXPLORER && (
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-white/50 transition-opacity backdrop-blur-sm">
                     <button onClick={(e) => {e.stopPropagation(); if(onEditMidi) onEditMidi(track.id)}} className="bg-cyan-600 text-white text-sm font-bold px-6 py-3 rounded-full shadow-lg flex items-center hover:bg-cyan-700 hover:scale-105 transition-all">
-                        <Edit3 size={18} className="mr-2"/> Abrir Piano
+                        <Edit3 size={18} className="mr-2"/> Abrir Editor
                     </button>
                 </div>
               )}
@@ -109,9 +113,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
   };
 
   const renderAudioContent = () => {
-      // High contrast colors for Explorer
       const isExplorer = mode === UserMode.EXPLORER;
-      const waveColor = isExplorer ? track.color.replace('bg-', '#').replace('600', '').replace('500', '') : "rgba(255,255,255,0.8)"; 
       // Basic logic to get a hex roughly from tailwind name for stroke, or fallback to dark gray
       const strokeColor = isExplorer ? "#374151" : "rgba(255,255,255,0.8)";
       
@@ -155,8 +157,6 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
 
   // --- EXPLORER MODE (DIDACTIC DESIGN) ---
   if (mode === UserMode.EXPLORER) {
-      // Calculate specific colors for the card header background based on track color
-      // We map the tailwind bg color to a very light version for the header bg
       let headerBg = "bg-gray-50";
       if(track.color.includes('rose') || track.color.includes('red')) headerBg = "bg-red-50";
       if(track.color.includes('blue') || track.color.includes('cyan') || track.color.includes('sky')) headerBg = "bg-blue-50";
@@ -181,7 +181,6 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                         <h3 className="font-fredoka text-xl font-bold text-gray-700 truncate" title={track.name}>{track.name}</h3>
                     </div>
                     
-                    {/* DELETE BUTTON: Top Right Corner, distinctly separated */}
                     <button 
                         onClick={(e) => { e.stopPropagation(); onDelete(track.id) }} 
                         className="p-2 rounded-xl text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors"
@@ -191,9 +190,8 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                     </button>
                 </div>
 
-                {/* Middle Row: Primary Actions (REC / MUTE / SOLO) */}
+                {/* Middle Row: Primary Actions */}
                 <div className="flex-1 flex items-center justify-between px-4 py-2">
-                    {/* Record Button - Prominent & Centered if possible */}
                     {track.type !== 'CHORD' && (
                         <div className="flex flex-col items-center justify-center w-full">
                             <button 
@@ -235,15 +233,15 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
 
             </div>
             
-            {/* WAVEFORM / MIDI AREA */}
+            {/* TRACK CONTENT (Auto switch Audio vs MIDI) */}
             <div className="flex-1 relative flex items-center bg-white overflow-hidden" ref={containerRef} style={widthStyle}>
-                {track.type === 'MIDI' ? renderMidiContent() : renderAudioContent()}
+                {isMidiTrack ? renderMidiContent() : renderAudioContent()}
             </div>
         </div>
       );
   }
 
-  // --- MAKER / PRO MODE (Darker, Techy) ---
+  // --- MAKER / PRO MODE (Darker) ---
   return (
       <div onClick={() => onSelect(track.id)} className={`flex w-full ${containerClass} overflow-hidden group transition-all cursor-pointer ${isSelectedClass} shrink-0`}>
          <div className={`w-64 ${stickyHeaderStyle} bg-[#1e1e1e] border-r border-black text-gray-300 flex flex-col p-2 justify-between relative flex-shrink-0`}>
@@ -258,28 +256,13 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
              </div>
              
              <div className="pl-2 flex items-center space-x-3 mb-1">
-                 <div className="flex flex-col items-center">
-                     <div className="w-6 h-6 rounded-full border border-gray-600 bg-[#222] relative flex items-center justify-center" title="Pan (L/R)">
-                         <div className="w-0.5 h-2 bg-gray-400 absolute top-1 origin-bottom transition-transform" style={{ transform: `rotate(${track.pan * 1.8}deg)` }}></div>
-                     </div>
-                     <input 
-                        type="range" min="-50" max="50" value={track.pan} 
-                        onChange={(e) => { e.stopPropagation(); if(onPanChange) onPanChange(track.id, parseInt(e.target.value)) }}
-                        className="opacity-0 absolute w-6 h-6 cursor-ew-resize"
-                        title="Pan"
-                     />
-                     <span className="text-[8px] text-gray-500 mt-0.5">{track.pan === 0 ? 'C' : track.pan > 0 ? 'R' : 'L'}</span>
-                 </div>
-
                  <div className="flex-1">
                      <input 
                         type="range" min="0" max="100" value={track.volume} 
                         onChange={(e) => {e.stopPropagation(); onVolumeChange(track.id, parseInt(e.target.value))}}
                         className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:bg-cyan-500 [&::-webkit-slider-thumb]:rounded-full"
-                        title={`Volumen: ${track.volume}%`}
                      />
                  </div>
-                 <div className="text-[9px] font-mono text-cyan-500 w-6 text-right">{track.volume}</div>
              </div>
 
              <div className="pl-2 flex items-center space-x-1">
@@ -290,7 +273,6 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
                         <button 
                             onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
                             className={`p-1 rounded-full border ${track.isArmed ? 'bg-red-500 text-white border-red-600 animate-pulse' : 'bg-[#2a2a2a] text-gray-600 border-gray-600 hover:text-red-400'}`}
-                            title={track.isArmed ? "Armada" : "Armar"}
                         >
                             <CircleDot size={10}/>
                         </button>
@@ -299,7 +281,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
              </div>
          </div>
          <div className="flex-1 relative overflow-hidden flex items-center bg-[#222]" ref={containerRef} style={widthStyle}>
-            {track.type === 'MIDI' ? renderMidiContent() : renderAudioContent()}
+            {isMidiTrack ? renderMidiContent() : renderAudioContent()}
          </div>
       </div>
   );
