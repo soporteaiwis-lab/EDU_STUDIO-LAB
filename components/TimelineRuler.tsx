@@ -1,3 +1,4 @@
+
 import React, { memo, useState, useRef } from 'react';
 import { UserMode, LoopRegion } from '../types';
 import { Repeat, Flag } from 'lucide-react';
@@ -6,13 +7,12 @@ interface TimelineRulerProps {
   mode: UserMode;
   bpm: number;
   zoom: number;
-  paddingLeft: number; 
   loopRegion: LoopRegion;
   onLoopChange: (region: LoopRegion) => void;
-  totalBars?: number; // New optional prop for dynamic length
+  totalBars: number;
 }
 
-export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zoom, paddingLeft, loopRegion, onLoopChange, totalBars = 100 }) => {
+export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zoom, loopRegion, onLoopChange, totalBars }) => {
   const [isDragging, setIsDragging] = useState<'START' | 'END' | 'NEW' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
 
@@ -32,9 +32,9 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!rulerRef.current) return;
     const rect = rulerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - paddingLeft + rulerRef.current.scrollLeft;
+    const x = e.clientX - rect.left; // Corrected: remove paddingLeft adjustment as it's relative
     
-    // Check if clicking near start or end handle (tolerance 10px)
+    // Check if clicking near start or end handle (tolerance 15px)
     if (Math.abs(x - startPx) < 15 && loopRegion.isActive) {
         setIsDragging('START');
     } else if (Math.abs(x - endPx) < 15 && loopRegion.isActive) {
@@ -50,7 +50,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   const handleMouseMove = (e: React.MouseEvent) => {
       if (!isDragging || !rulerRef.current) return;
       const rect = rulerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - paddingLeft + rulerRef.current.scrollLeft;
+      const x = e.clientX - rect.left;
       const currentBar = getBarFromX(x);
 
       if (isDragging === 'START') {
@@ -72,7 +72,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   const markers = [];
   
   for (let i = 0; i < totalBars; i++) {
-      const leftPos = (i * pixelsPerBar) + paddingLeft;
+      const leftPos = (i * pixelsPerBar);
       markers.push(
           <div key={`bar-${i}`} className="absolute top-0 bottom-0 border-l border-white/20 pl-1.5 select-none h-full group" style={{ left: `${leftPos}px` }}>
               <span className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-white">{i + 1}</span>
@@ -91,13 +91,14 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   return (
     <div 
         ref={rulerRef}
-        className="relative h-9 w-full border-b border-black bg-[#151515] overflow-hidden flex-shrink-0 cursor-ew-resize select-none"
+        className="relative h-9 w-full bg-[#151515] overflow-hidden flex-shrink-0 cursor-ew-resize select-none border-b border-black"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        style={{ minWidth: `${totalBars * pixelsPerBar}px` }} // Force width
     >
-       <div className="absolute inset-0 pointer-events-none" style={{ width: `${(totalBars * pixelsPerBar) + paddingLeft}px` }}>
+       <div className="absolute inset-0 pointer-events-none" style={{ width: `${totalBars * pixelsPerBar}px` }}>
           {markers}
        </div>
 
@@ -107,7 +108,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
                {/* Selection Background */}
                <div 
                     className="absolute top-0 bottom-0 bg-green-500/10 border-b-2 border-green-500 z-10 pointer-events-none"
-                    style={{ left: `${paddingLeft + startPx}px`, width: `${widthPx}px` }}
+                    style={{ left: `${startPx}px`, width: `${widthPx}px` }}
                >
                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-green-900/80 px-1 rounded-b text-[8px] text-green-300 font-bold tracking-wider flex items-center">
                         <Repeat size={8} className="mr-1"/> LOOP
@@ -115,19 +116,10 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
                </div>
                
                {/* Handles */}
-               <div className="absolute top-0 bottom-0 w-1 bg-green-500 cursor-ew-resize z-20 hover:brightness-150" style={{ left: `${paddingLeft + startPx}px` }} title="Inicio Loop"></div>
-               <div className="absolute top-0 bottom-0 w-1 bg-red-500 cursor-ew-resize z-20 hover:brightness-150" style={{ left: `${paddingLeft + endPx}px` }} title="Fin Loop"></div>
+               <div className="absolute top-0 bottom-0 w-1 bg-green-500 cursor-ew-resize z-20 hover:brightness-150" style={{ left: `${startPx}px` }} title="Inicio Loop"></div>
+               <div className="absolute top-0 bottom-0 w-1 bg-red-500 cursor-ew-resize z-20 hover:brightness-150" style={{ left: `${endPx}px` }} title="Fin Loop"></div>
            </>
        )}
-
-       {/* HEADER MASK (Left Panel Cover) */}
-       <div 
-          className="absolute top-0 bottom-0 left-0 bg-[#151515] border-r border-black z-30 flex items-center justify-center text-[10px] font-bold text-gray-400 shadow-[2px_0_5px_rgba(0,0,0,0.5)]"
-          style={{ width: `${paddingLeft}px` }}
-       >
-          <Flag size={14} className="mr-2 text-cyan-600"/>
-          <span className="opacity-70 tracking-widest text-cyan-500">TIMELINE</span>
-       </div>
     </div>
   );
 });

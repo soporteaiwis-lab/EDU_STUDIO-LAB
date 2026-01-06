@@ -38,7 +38,7 @@ const INITIAL_METADATA: SongMetadata = {
     lyrics: ''
 };
 
-const HEADER_WIDTH = 320; // Increased to accommodate wider Explorer header (was 260)
+const HEADER_WIDTH = 320; 
 
 export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }) => {
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
@@ -56,13 +56,11 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const [zoom, setZoom] = useState(1);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [loopRegion, setLoopRegion] = useState<LoopRegion>({ startBar: 1, endBar: 5, isActive: true });
-  
-  // Dynamic Project Length
-  const [totalBars, setTotalBars] = useState(64); // Increased default bars
+  const [totalBars, setTotalBars] = useState(32); // Default to 32 bars
 
   // Metronome Settings State
   const [showMetronomeSettings, setShowMetronomeSettings] = useState(false);
-  const [showTimeSigSelector, setShowTimeSigSelector] = useState(false); // NEW STATE
+  const [showTimeSigSelector, setShowTimeSigSelector] = useState(false); 
   const [metronomeVolume, setMetronomeVolume] = useState(-10);
   const [countIn, setCountIn] = useState<'OFF' | '1BAR' | '2BAR'>('OFF');
   const [tapTempoTaps, setTapTempoTaps] = useState<number[]>([]);
@@ -73,7 +71,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
 
   const recordingTrackIdRef = useRef<string | null>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
-  const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const timelineScrollRef = useRef<HTMLDivElement>(null); // Unified Scroll Ref
   const animationRef = useRef<number>(0);
   const metronomeRef = useRef<HTMLDivElement>(null);
 
@@ -99,29 +97,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const editingTrack = tracks.find(t => t.id === editingMidiTrackId);
   const showPianoPanel = (selectedTrack?.type === 'MIDI' || selectedTrack?.type === 'CHORD' || selectedTrack?.type === 'MELODY') && !editingMidiTrackId;
 
-  // Header Width changes based on mode
   const currentHeaderWidth = isExplorer ? 320 : 260;
-
-  // --- DYNAMIC TIMELINE CALCULATION ---
-  useEffect(() => {
-    // Calculate the last bar based on MIDI notes or default audio length
-    let maxTime = 0;
-    tracks.forEach(t => {
-        if (t.midiNotes && t.midiNotes.length > 0) {
-            const lastNote = t.midiNotes[t.midiNotes.length - 1];
-            if (lastNote.startTime + lastNote.duration > maxTime) {
-                maxTime = lastNote.startTime + lastNote.duration;
-            }
-        }
-        // Approximate audio tracks
-        if (t.type === 'AUDIO' && maxTime < 60) maxTime = 60; 
-    });
-
-    const secondsPerBar = (60 / bpm) * 4;
-    const calculatedBars = Math.ceil(maxTime / secondsPerBar) + 16; // Add generous padding
-    // Ensure we don't shrink below user edits or default view
-    setTotalBars(Math.max(64, calculatedBars)); 
-  }, [tracks, bpm]);
 
   // --- AI PRODUCER CHECK ---
   useEffect(() => {
@@ -191,13 +167,15 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
       if (playheadRef.current) {
         const time = audioService.getCurrentTime();
         const pixelsPerSecond = 40 * zoom; 
-        playheadRef.current.style.transform = `translateX(${currentHeaderWidth + (time * pixelsPerSecond)}px)`;
+        playheadRef.current.style.transform = `translateX(${time * pixelsPerSecond}px)`;
+        
+        // Auto-scroll if playing and out of view could be implemented here
       }
       animationRef.current = requestAnimationFrame(animate);
     };
     animationRef.current = requestAnimationFrame(animate);
     return () => { if(animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [zoom, currentHeaderWidth]); 
+  }, [zoom]); 
 
   const handleTapTempo = () => {
       const now = Date.now();
@@ -217,8 +195,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   };
 
   const handleFitToScreen = () => {
-      if (!timelineContainerRef.current) return;
-      const availableWidth = timelineContainerRef.current.clientWidth - currentHeaderWidth;
+      if (!timelineScrollRef.current) return;
+      const availableWidth = timelineScrollRef.current.clientWidth - currentHeaderWidth;
       const secondsPerBar = (60 / bpm) * 4;
       const totalSeconds = totalBars * secondsPerBar;
       const newZoom = availableWidth / (totalSeconds * 40);
@@ -247,10 +225,12 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
         audioService.pause(); 
     } else { 
         tracks.forEach(t => {
-            if (t.type === 'CHORD' && t.chordData) audioService.scheduleChords(t.id, t.chordData);
-            if ((t.type === 'RHYTHM' || t.type === 'DRUMS') && t.rhythmData) audioService.scheduleDrums(t.id, t.rhythmData);
-            if (t.type === 'MELODY' && t.melodyData) audioService.scheduleMelody(t.id, t.melodyData);
-            if (t.type === 'MIDI' && t.midiNotes) audioService.scheduleMidi(t.id, t.midiNotes);
+            if (t.type === 'MIDI' || t.type === 'CHORD' || t.type === 'MELODY') {
+                if (t.midiNotes) audioService.scheduleMidi(t.id, t.midiNotes);
+            }
+            if ((t.type === 'RHYTHM' || t.type === 'DRUMS') && t.rhythmData) {
+                audioService.scheduleDrums(t.id, t.rhythmData);
+            }
         });
         audioService.play(); 
     }
@@ -263,20 +243,17 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const handleForward = () => { const t = audioService.getCurrentTime(); audioService.setTime(t + 10); };
   
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = timelineContainerRef.current?.getBoundingClientRect();
-    if (rect) {
-        let x = e.clientX - rect.left + (timelineContainerRef.current?.scrollLeft || 0);
-        if (x < currentHeaderWidth) x = currentHeaderWidth;
-        const pixelsPerSecond = 40 * zoom;
-        let time = (x - currentHeaderWidth) / pixelsPerSecond;
-        if (snapEnabled) {
-            const beatDuration = 60 / bpm;
-            const barDuration = beatDuration * 4; 
-            const snappedTime = Math.round(time / (barDuration / 4)) * (barDuration / 4); 
-            time = snappedTime;
-        }
-        audioService.setTime(Math.max(0, time));
+    // Seek logic now applies inside the scroll container
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pixelsPerSecond = 40 * zoom;
+    let time = x / pixelsPerSecond;
+    if (snapEnabled) {
+        const beatDuration = 60 / bpm;
+        const snap = beatDuration; // Snap to beat
+        time = Math.round(time / snap) * snap;
     }
+    audioService.setTime(Math.max(0, time));
   };
 
   const handleRecordToggle = async () => {
@@ -303,7 +280,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
         if (target.type === 'AUDIO') {
             if (!(await audioService.checkPermissions())) { alert("Permiso de micrófono denegado."); return; }
             await audioService.startRecording(); 
-        } else if (target.type === 'MIDI') {
+        } else if (target.type === 'MIDI' || target.type === 'CHORD' || target.type === 'MELODY') {
             audioService.setMidiRecordingState(true);
             audioService.setActiveMidiTrack(target.id);
         }
@@ -362,32 +339,29 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
 
     for(let i=0; i<totalBars; i++) {
         lines.push(
-            <div key={`bar-${i}`} className={`absolute top-0 bottom-0 w-px border-l ${lineColor} pointer-events-none`} style={{left: `${currentHeaderWidth + (i * pixelsPerBar)}px`}}></div>
+            <div key={`bar-${i}`} className={`absolute top-0 bottom-0 w-px border-l ${lineColor} pointer-events-none`} style={{left: `${i * pixelsPerBar}px`}}></div>
         );
         if(zoom > 0.8) {
              for(let j=1; j<4; j++) {
-                 lines.push(<div key={`beat-${i}-${j}`} className={`absolute top-0 bottom-0 w-px border-l ${lineColor} border-dotted pointer-events-none`} style={{left: `${currentHeaderWidth + (i * pixelsPerBar) + (j * (pixelsPerBar/4))}px`}}></div>);
+                 lines.push(<div key={`beat-${i}-${j}`} className={`absolute top-0 bottom-0 w-px border-l ${lineColor} border-dotted pointer-events-none`} style={{left: `${i * pixelsPerBar + (j * (pixelsPerBar/4))}px`}}></div>);
              }
         }
     }
     // END MARKER
     lines.push(
-        <div key="end-marker" className="absolute top-0 bottom-0 w-1 bg-red-500/50 z-20 pointer-events-none flex items-end pb-2 pl-1" style={{left: `${currentHeaderWidth + (totalBars * pixelsPerBar)}px`}}>
+        <div key="end-marker" className="absolute top-0 bottom-0 w-1 bg-red-500/50 z-20 pointer-events-none flex items-end pb-2 pl-1" style={{left: `${totalBars * pixelsPerBar}px`}}>
             <span className="text-[10px] text-red-400 font-bold -rotate-90 origin-bottom-left whitespace-nowrap">FIN CANCIÓN</span>
         </div>
     );
     return lines;
-  }, [bpm, zoom, totalBars, currentHeaderWidth, isExplorer]);
+  }, [bpm, zoom, totalBars, isExplorer]);
 
-  // Important: We calculate track width dynamically to ensure content is reachable
-  const trackContentWidth = (totalBars * (60 / bpm) * 4 * (40 * zoom)) + 100;
-  const totalContainerWidth = currentHeaderWidth + trackContentWidth;
+  // Track Width based on total bars
+  const trackContentWidth = totalBars * (60 / bpm) * 4 * (40 * zoom);
 
-  // Execute AI Suggestion
   const applyProducerAdvice = () => {
       if(!producerAdvice?.actionType) return;
-      if(producerAdvice.actionType === 'ADD_DRUMS') setShowCreative(true); // Open AI Creative
-      // Other actions could be implemented here
+      if(producerAdvice.actionType === 'ADD_DRUMS') setShowCreative(true); 
       setShowProducer(false);
   }
 
@@ -505,6 +479,10 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                              <div className="flex justify-between text-[10px] font-bold text-gray-500"><span>Volumen Click</span><span>{metronomeVolume} dB</span></div>
                              <input type="range" min="-40" max="0" value={metronomeVolume} onChange={(e) => setMetronomeVolume(parseInt(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:bg-cyan-500"/>
                          </div>
+                         <div className="pt-2 border-t border-white/5">
+                             <div className="text-[10px] font-bold text-gray-500 mb-1">Compases Totales</div>
+                             <input type="number" min="8" max="200" value={totalBars} onChange={(e) => setTotalBars(parseInt(e.target.value))} className="w-full bg-black/40 text-white p-2 text-xs rounded border border-white/10"/>
+                         </div>
                      </div>
                  )}
 
@@ -557,41 +535,67 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
             )}
             
             <div className={`flex-1 flex flex-col min-w-0 relative h-full ${isExplorer ? 'bg-gray-200' : 'bg-[#080808]'}`}>
-                <div ref={timelineContainerRef} className={`flex-1 overflow-auto relative scroll-smooth custom-scrollbar ${isExplorer ? '' : "bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"}`}>
-                     <div className={`sticky top-0 z-30 w-fit ${isExplorer ? 'bg-gray-200' : 'bg-[#080808]'}`}>
-                        <TimelineRuler mode={userMode} bpm={bpm} zoom={zoom} paddingLeft={currentHeaderWidth} loopRegion={loopRegion} onLoopChange={setLoopRegion} totalBars={totalBars} />
-                     </div>
+                {/* UNIFIED SCROLL CONTAINER FOR RULER AND TRACKS */}
+                <div ref={timelineScrollRef} className={`flex-1 overflow-auto relative scroll-smooth custom-scrollbar ${isExplorer ? '' : "bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"}`}>
+                     
+                     {/* Sticky Header Layout Wrapper */}
+                     <div className="min-w-fit flex flex-col">
+                         {/* Ruler is sticky to top of this container */}
+                         <div className={`sticky top-0 z-30 ${isExplorer ? 'bg-gray-200' : 'bg-[#080808]'}`} style={{ paddingLeft: `${currentHeaderWidth}px` }}>
+                            <TimelineRuler mode={userMode} bpm={bpm} zoom={zoom} loopRegion={loopRegion} onLoopChange={setLoopRegion} totalBars={totalBars} />
+                         </div>
 
-                     {/* Tracks Container with Dynamic Width */}
-                     <div className="relative pb-32" style={{ width: `${totalContainerWidth}px`, minWidth: '100%' }}>
-                         <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">{gridLines}</div>
-                         <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${currentHeaderWidth}px)` }}>
-                             <div className="w-5 h-5 -ml-[9px] bg-cyan-400 transform rotate-45 -mt-2.5 shadow-md flex items-center justify-center border border-white">
-                                 <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                         {/* Tracks Container */}
+                         <div className="relative pb-32">
+                             
+                             {/* Container inner for alignment */}
+                             <div className="relative" style={{ width: `${currentHeaderWidth + trackContentWidth}px`, minWidth: '100%' }}>
+                                 {/* Grid Lines */}
+                                 <div className="absolute top-0 bottom-0 pointer-events-none z-0" style={{ left: `${currentHeaderWidth}px`, right: 0 }}>
+                                     {gridLines}
+                                 </div>
+                                 
+                                 {/* Playhead */}
+                                 <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: `${currentHeaderWidth}px` }}>
+                                     <div className="w-5 h-5 -ml-[9px] bg-cyan-400 transform rotate-45 -mt-2.5 shadow-md flex items-center justify-center border border-white">
+                                         <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                     </div>
+                                 </div>
+
+                                 {/* Loop Region Overlay */}
+                                 {loopRegion.isActive && (
+                                     <div className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0" style={{ left: currentHeaderWidth + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom }}></div>
+                                 )}
+
+                                 {/* Tracks List */}
+                                 <div className="relative z-10 pt-4 px-4 space-y-3">
+                                    {tracks.map(track => (
+                                        <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom} totalWidth={trackContentWidth}
+                                            onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
+                                            onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} 
+                                            onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} 
+                                            onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} 
+                                            onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} 
+                                            onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} 
+                                            onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} 
+                                            onEditMidi={(id) => setEditingMidiTrackId(id)}
+                                        />
+                                    ))}
+                                 </div>
+
+                                 {/* Add Track Area */}
+                                 <div className="mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: currentHeaderWidth }}>
+                                     <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-dashed border-white/10 hover:border-white/30 transition-all"><Plus size={16} className="mr-2"/> Nueva Pista</button>
+                                </div>
+                                
+                                {/* Clickable Seek Area Overlay (transparent) */}
+                                <div 
+                                    className="absolute inset-0 z-0 cursor-crosshair" 
+                                    style={{ left: `${currentHeaderWidth}px` }}
+                                    onClick={handleSeek}
+                                ></div>
                              </div>
                          </div>
-                         {loopRegion.isActive && (
-                             <div className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0" style={{ left: currentHeaderWidth + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom }}></div>
-                         )}
-
-                         <div className="relative z-10 pt-4 px-4 space-y-3">
-                            {tracks.map(track => (
-                                <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom} totalWidth={trackContentWidth}
-                                    onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
-                                    onPanChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, pan: v } : t)); audioService.setPan(id, v);}} 
-                                    onToggleMute={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isMuted:!t.isMuted}:x)); audioService.toggleMute(id, !t.isMuted);}}} 
-                                    onToggleSolo={(id) => {const t=tracks.find(x=>x.id===id); if(t){setTracks(prev=>prev.map(x=>x.id===id?{...x,isSolo:!t.isSolo}:x)); audioService.toggleSolo(id, !t.isSolo);}}} 
-                                    onToggleArm={(id) => setTracks(prev => prev.map(t => ({...t, isArmed: t.id === id ? !t.isArmed : false})))} 
-                                    onDelete={(id) => { audioService.removeTrack(id); setTracks(prev => prev.filter(t => t.id !== id)); }} 
-                                    onSelect={(id) => { setSelectedTrackId(id); setShowInspector(true); }} 
-                                    onEditMidi={(id) => setEditingMidiTrackId(id)}
-                                />
-                            ))}
-                         </div>
-
-                         <div className="mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: currentHeaderWidth }}>
-                             <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-dashed border-white/10 hover:border-white/30 transition-all"><Plus size={16} className="mr-2"/> Nueva Pista</button>
-                        </div>
                      </div>
                 </div>
                 
@@ -656,7 +660,27 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                 </div>
             </div>
         )}
-        {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={(t)=>setMetadata(p=>({...p,lyrics:t}))} onImportChords={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Acordes ${d.key}`,type:'CHORD',instrument:'CHORD',color:'bg-blue-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,chordData:d.progression}]);audioService.addTrack(id,'','INSTRUMENT');}} onImportRhythm={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Batería ${d.style}`,type:'RHYTHM',instrument:'DRUMS',color:'bg-red-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,rhythmData:d.events}]);audioService.addTrack(id,'','DRUMS');}} onImportMelody={(d)=>{const id=Date.now().toString();setTracks(p=>[...p,{id,name:`Melodía ${d.key}`,type:'MELODY',instrument:'KEYS',color:'bg-yellow-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,melodyData:d.events}]);audioService.addTrack(id,'','INSTRUMENT');}} />}
+        {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={(t)=>setMetadata(p=>({...p,lyrics:t}))} 
+            onImportChords={(d)=>{
+                const id=Date.now().toString();
+                // CONVERT AI CHORDS TO MIDI NOTES
+                const notes = audioService.convertChordsToMidi(d.progression);
+                setTracks(p=>[...p,{id,name:`Acordes ${d.key}`,type:'CHORD',instrument:'CHORD',color:'bg-blue-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,chordData:d.progression, midiNotes: notes}]);
+                audioService.addTrack(id,'','INSTRUMENT');
+            }} 
+            onImportRhythm={(d)=>{
+                const id=Date.now().toString();
+                setTracks(p=>[...p,{id,name:`Batería ${d.style}`,type:'RHYTHM',instrument:'DRUMS',color:'bg-red-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,rhythmData:d.events}]);
+                audioService.addTrack(id,'','DRUMS');
+            }} 
+            onImportMelody={(d)=>{
+                const id=Date.now().toString();
+                // CONVERT AI MELODY TO MIDI NOTES
+                const notes = audioService.convertMelodyToMidi(d.events);
+                setTracks(p=>[...p,{id,name:`Melodía ${d.key}`,type:'MELODY',instrument:'KEYS',color:'bg-yellow-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,melodyData:d.events, midiNotes: notes}]);
+                audioService.addTrack(id,'','INSTRUMENT');
+            }} 
+        />}
         {pendingImport && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]"><div className="bg-[#1e1e1e] p-6 rounded-2xl shadow-2xl w-96 animate-slide-up border border-white/10"><h3 className="text-xl font-bold mb-2 text-white">Importar Archivo</h3><p className="text-sm text-gray-400 mb-4 break-all">"{pendingImport.name}"</p><div className="space-y-3"><button onClick={() => confirmImport('AUDIO')} className="w-full p-3 bg-blue-900/30 hover:bg-blue-900/50 rounded-xl flex items-center font-bold text-blue-300 border border-blue-500/30"><div className="bg-blue-600 text-white p-2 rounded-full mr-3"><FileAudio size={18}/></div><div><div className="text-sm">Pista de Audio</div></div></button><button onClick={() => confirmImport('MIDI')} className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center font-bold text-gray-300 border border-gray-600"><div className="bg-gray-600 text-white p-2 rounded-full mr-3"><Music size={18}/></div><div><div className="text-sm">Pista MIDI</div></div></button></div><button onClick={() => setPendingImport(null)} className="mt-4 text-gray-500 text-xs hover:text-white font-bold block mx-auto uppercase">Cancelar</button></div></div>}
         {importModal && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"><div className="bg-[#1e1e1e] p-6 rounded-2xl shadow-xl w-96 border border-white/10"><h3 className="text-xl font-bold mb-4 text-white">Crear Nueva Pista</h3><div className="space-y-3"><button onClick={() => addTrack('AUDIO')} className="w-full p-4 bg-blue-900/30 hover:bg-blue-900/50 rounded-xl flex items-center font-bold text-blue-300 border border-blue-500/30"><div className="bg-blue-600 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>Audio / Voz (Mic)</button><button onClick={() => addTrack('MIDI')} className="w-full p-4 bg-orange-900/30 hover:bg-orange-900/50 rounded-xl flex items-center font-bold text-orange-300 border border-orange-500/30"><div className="bg-orange-600 text-white p-2 rounded-full mr-3"><Settings size={20}/></div>Instrumento Virtual (MIDI)</button></div><button onClick={() => setImportModal(false)} className="mt-4 text-gray-500 text-sm hover:text-white font-bold block mx-auto">Cancelar</button></div></div>}
     </div>

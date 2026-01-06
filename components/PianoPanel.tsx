@@ -14,7 +14,7 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
   
   // Piano Configuration
   const [startOctave, setStartOctave] = useState(3);
-  const [numOctaves, setNumOctaves] = useState(2); // 2 octaves default (25 keys)
+  const [numOctaves, setNumOctaves] = useState(2); // 2 octaves default
   const [sustain, setSustain] = useState(false);
   const [midiConnected, setMidiConnected] = useState(false);
 
@@ -51,7 +51,6 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
   };
 
   // Generate Keys based on Range
-  // Standard Piano starts at C usually for these ranges.
   const startNote = 12 * startOctave; // C{startOctave}
   const totalKeys = (numOctaves * 12) + 1; // +1 to end on C
   const keys = [];
@@ -70,15 +69,6 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
           label: midi % 12 === 0 ? `C${octave}` : null 
       });
   }
-
-  // Calculate Black Key Positions using Flexbox logic requires a different approach.
-  // We will render White Keys in a Flex container.
-  // Black keys will be absolute positioned children of the WHITE KEYS container, 
-  // or we use a precise CSS grid.
-  
-  // Better Approach: 
-  // Render a "KeyContainer" for every White Key. 
-  // If the White Key has a Black Key to its right, render the Black Key absolutely positioned on the right edge.
   
   const whiteKeys = keys.filter(k => !k.isBlack);
 
@@ -86,18 +76,18 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
     <div className="fixed bottom-0 left-0 right-0 h-72 bg-[#121212] border-t-4 border-[#333] z-50 flex flex-col shadow-2xl animate-slide-up select-none">
         
         {/* CONTROL BAR */}
-        <div className="h-14 bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-6">
+        <div className="h-14 bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-6 shrink-0">
             <div className="flex items-center gap-6">
                 
                 {/* MIDI STATUS */}
-                <span className="text-xs font-bold text-gray-500 uppercase flex items-center bg-black/20 px-3 py-1.5 rounded-full border border-gray-800">
+                <span className="text-xs font-bold text-gray-500 uppercase flex items-center bg-black/20 px-3 py-1.5 rounded-full border border-gray-800 hidden md:flex">
                     <span className={`w-2 h-2 rounded-full mr-2 ${midiConnected ? 'bg-green-500 shadow-[0_0_8px_lime]' : 'bg-red-500'}`}></span>
-                    {midiConnected ? "MIDI CONECTADO" : "MIDI OFF"}
+                    {midiConnected ? "MIDI ON" : "MIDI OFF"}
                 </span>
 
                 {/* KEYBOARD SIZE PRESETS */}
                 <div className="flex items-center space-x-1 bg-[#111] rounded p-1 border border-gray-700">
-                    <span className="text-[10px] text-gray-500 font-bold px-2 uppercase">Tamaño</span>
+                    <span className="text-[10px] text-gray-500 font-bold px-2 uppercase hidden sm:inline">Teclas</span>
                     <button onClick={() => setNumOctaves(2)} className={`px-2 py-1 text-xs font-bold rounded ${numOctaves===2 ? 'bg-cyan-700 text-white' : 'text-gray-400 hover:text-white'}`}>25</button>
                     <button onClick={() => setNumOctaves(4)} className={`px-2 py-1 text-xs font-bold rounded ${numOctaves===4 ? 'bg-cyan-700 text-white' : 'text-gray-400 hover:text-white'}`}>49</button>
                     <button onClick={() => setNumOctaves(5)} className={`px-2 py-1 text-xs font-bold rounded ${numOctaves===5 ? 'bg-cyan-700 text-white' : 'text-gray-400 hover:text-white'}`}>61</button>
@@ -105,7 +95,7 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
 
                 {/* OCTAVE SHIFT */}
                 <div className="flex items-center space-x-2 bg-[#111] rounded p-1 border border-gray-700">
-                    <span className="text-[10px] text-gray-500 font-bold px-2 uppercase">Octava {startOctave}</span>
+                    <span className="text-[10px] text-gray-500 font-bold px-2 uppercase hidden sm:inline">Octava {startOctave}</span>
                     <button onClick={() => setStartOctave(Math.max(0, startOctave - 1))} className="p-1 text-gray-400 hover:text-white"><ArrowLeftCircle size={16}/></button>
                     <button onClick={() => setStartOctave(Math.min(7, startOctave + 1))} className="p-1 text-gray-400 hover:text-white"><ArrowRightCircle size={16}/></button>
                 </div>
@@ -113,15 +103,15 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
                 {/* SUSTAIN */}
                 <button 
                     onClick={toggleSustain}
-                    className={`flex items-center space-x-2 px-4 py-1.5 rounded-full border text-xs font-bold transition-all ${sustain ? 'bg-cyan-900/50 text-cyan-400 border-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-[#222] text-gray-500 border-gray-700 hover:bg-[#333]'}`}
+                    className={`hidden md:flex items-center space-x-2 px-4 py-1.5 rounded-full border text-xs font-bold transition-all ${sustain ? 'bg-cyan-900/50 text-cyan-400 border-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-[#222] text-gray-500 border-gray-700 hover:bg-[#333]'}`}
                 >
                     <Zap size={14} className={sustain ? "fill-current" : ""}/>
-                    <span>Sostenimiento (Pedal)</span>
+                    <span>Pedal</span>
                 </button>
             </div>
 
             <div className="flex items-center space-x-4">
-                 <div className="text-right">
+                 <div className="text-right hidden sm:block">
                     <div className="text-[10px] font-bold text-gray-500 uppercase">Instrumento</div>
                     <div className="text-sm font-bold text-cyan-500 uppercase">{currentInstrument || 'Grand Piano'}</div>
                  </div>
@@ -130,43 +120,41 @@ export const PianoPanel: React.FC<PianoPanelProps> = ({ currentInstrument, onClo
         </div>
 
         {/* KEYS CONTAINER */}
-        <div className="flex-1 relative overflow-x-auto overflow-y-hidden bg-[#0a0a0a] flex justify-center custom-scrollbar">
-             <div className="relative h-full flex px-10"> {/* Padding x to allow scrolling if needed */}
+        <div className="flex-1 relative overflow-x-auto overflow-y-hidden bg-[#0a0a0a] custom-scrollbar">
+             {/* Use min-width based on key count to allow scrolling if too big, but fit if small */}
+             <div className="relative h-full flex px-4 md:px-10 mx-auto" style={{ minWidth: numOctaves > 3 ? '1200px' : '100%', width: 'fit-content' }}> 
                 
                 {whiteKeys.map((wk) => {
-                     // Check if this white key has a black key to its right
-                     // Logic: If next midi note is black, render it here.
                      const nextMidi = wk.midi + 1;
                      const hasBlackKey = [1, 3, 6, 8, 10].includes(nextMidi % 12);
-                     
                      const isWhiteActive = activeNotes.has(wk.midi);
                      const isBlackActive = hasBlackKey ? activeNotes.has(nextMidi) : false;
 
                      return (
-                        <div key={wk.midi} className="relative h-full flex-shrink-0">
+                        <div key={wk.midi} className="relative h-full flex-shrink-0" style={{ flexBasis: '40px', flexGrow: 1 }}>
                             {/* White Key */}
                             <div 
                                 onMouseDown={(e) => { if(e.buttons === 1) handleNoteStart(wk.midi); }}
                                 onMouseEnter={(e) => { if(e.buttons === 1) handleNoteStart(wk.midi); }}
                                 onMouseUp={() => handleNoteEnd(wk.midi)}
                                 onMouseLeave={() => handleNoteEnd(wk.midi)}
-                                className={`w-12 h-full border-l border-b-4 border-r border-[#999] rounded-b-lg active:bg-gray-200 cursor-pointer transition-colors z-10 flex flex-col justify-end items-center pb-4 ${isWhiteActive ? 'bg-cyan-200 border-b-cyan-400' : 'bg-white hover:bg-gray-50 border-b-[#ccc]'}`}
+                                className={`w-full h-full border-l border-b-4 border-r border-[#999] rounded-b-lg active:bg-gray-200 cursor-pointer transition-colors z-10 flex flex-col justify-end items-center pb-4 ${isWhiteActive ? 'bg-cyan-200 border-b-cyan-400' : 'bg-white hover:bg-gray-50 border-b-[#ccc]'}`}
                             >
-                                {wk.label && <span className="text-gray-400 text-xs font-bold">{wk.label}</span>}
+                                {wk.label && <span className="text-gray-400 text-[10px] font-bold select-none">{wk.label}</span>}
                             </div>
                             
-                            {/* Black Key (Absolute relative to this white key) */}
+                            {/* Black Key */}
                             {hasBlackKey && (
                                 <div 
                                     className="absolute top-0 z-20"
-                                    style={{ left: '32px', width: '32px', height: '60%' }} // Positioned exactly between keys
+                                    style={{ left: '60%', width: '70%', height: '60%', transform: 'translateX(-15%)' }} 
                                 >
                                      <div 
                                         onMouseDown={(e) => { e.stopPropagation(); if(e.buttons === 1) handleNoteStart(nextMidi); }}
                                         onMouseEnter={(e) => { e.stopPropagation(); if(e.buttons === 1) handleNoteStart(nextMidi); }}
                                         onMouseUp={() => handleNoteEnd(nextMidi)}
                                         onMouseLeave={() => handleNoteEnd(nextMidi)}
-                                        className={`w-8 mx-auto h-full rounded-b-md border-x border-b border-black cursor-pointer shadow-lg transition-colors ${isBlackActive ? 'bg-cyan-600' : 'bg-black hover:bg-[#222] bg-gradient-to-b from-[#333] to-black'}`}
+                                        className={`w-full h-full rounded-b-md border-x border-b border-black cursor-pointer shadow-lg transition-colors ${isBlackActive ? 'bg-cyan-600' : 'bg-black hover:bg-[#222] bg-gradient-to-b from-[#333] to-black'}`}
                                      ></div>
                                 </div>
                             )}

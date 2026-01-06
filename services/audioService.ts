@@ -45,14 +45,16 @@ class AudioService {
   private sustainEnabled: boolean = false;
   private metronomeVolumeValue: number = -10; // dB
 
-  private chordMap: Record<string, string[]> = {
-      'C': ['C4', 'E4', 'G4'], 'Cm': ['C4', 'Eb4', 'G4'], 'C7': ['C4', 'E4', 'G4', 'Bb4'],
-      'D': ['D4', 'F#4', 'A4'], 'Dm': ['D4', 'F4', 'A4'], 'D7': ['D4', 'F#4', 'A4', 'C5'],
-      'E': ['E4', 'G#4', 'B4'], 'Em': ['E4', 'G4', 'B4'], 'E7': ['E4', 'G#4', 'B4', 'D5'],
-      'F': ['F4', 'A4', 'C5'], 'Fm': ['F4', 'Ab4', 'C5'], 'G': ['G3', 'B3', 'D4'],
-      'Gm': ['G3', 'Bb3', 'D4'], 'G7': ['G3', 'B3', 'D4', 'F4'],
-      'A': ['A3', 'C#4', 'E4'], 'Am': ['A3', 'C4', 'E4'], 'Am7': ['A3', 'C4', 'E4', 'G4'],
-      'B': ['B3', 'D#4', 'F#4'], 'Bm': ['B3', 'D4', 'F#4']
+  // Simple Chord Dictionary for AI translation
+  private chordMap: Record<string, number[]> = {
+      'C': [60, 64, 67], 'Cm': [60, 63, 67], 'C7': [60, 64, 67, 70],
+      'Cmaj7': [60, 64, 67, 71],
+      'D': [62, 66, 69], 'Dm': [62, 65, 69], 'D7': [62, 66, 69, 72],
+      'E': [64, 68, 71], 'Em': [64, 67, 71], 'E7': [64, 68, 71, 74],
+      'F': [65, 69, 72], 'Fm': [65, 68, 72], 'Fmaj7': [65, 69, 72, 76],
+      'G': [67, 71, 74], 'Gm': [67, 70, 74], 'G7': [67, 71, 74, 77],
+      'A': [69, 73, 76], 'Am': [69, 72, 76], 'Am7': [69, 72, 76, 79],
+      'B': [71, 75, 78], 'Bm': [71, 74, 78], 'Bdim': [71, 74, 77]
   };
 
   constructor() { }
@@ -94,6 +96,68 @@ class AudioService {
       this.metronomeVolumeValue = db;
       if (this.metronomeSynth) this.metronomeSynth.volume.value = db;
       if (this.metronomeClick) this.metronomeClick.volume.value = db - 5; // Click slightly quieter
+  }
+
+  // --- HELPER: CONVERT AI CHORDS TO MIDI NOTES ---
+  convertChordsToMidi(chords: ChordEvent[]): MidiNote[] {
+      const midiNotes: MidiNote[] = [];
+      const secondsPerBar = (60 / this.bpm) * 4;
+
+      chords.forEach(chord => {
+          // Normalize chord name (remove extra spaces, handle basic inversions if needed later)
+          const cleanName = chord.name.trim();
+          let notes = this.chordMap[cleanName];
+          
+          // Fallback logic if exact chord not found (e.g., simplified triad)
+          if (!notes) {
+              const root = cleanName.charAt(0);
+              const isMinor = cleanName.includes('m');
+              if (this.chordMap[root + (isMinor?'m':'')]) {
+                  notes = this.chordMap[root + (isMinor?'m':'')];
+              } else {
+                  notes = [60, 64, 67]; // Default C Major if fails
+              }
+          }
+
+          // Move down one octave for harmony/pad feel
+          const octaveShift = -12; 
+
+          const startTime = (chord.bar - 1) * secondsPerBar;
+          // Default duration is 1 bar if not specified
+          const duration = (chord.duration || 1) * secondsPerBar;
+
+          notes.forEach(midi => {
+              midiNotes.push({
+                  note: Tone.Frequency(midi + octaveShift, "midi").toNote(),
+                  midi: midi + octaveShift,
+                  startTime: startTime,
+                  duration: duration,
+                  velocity: 0.6
+              });
+          });
+      });
+      return midiNotes;
+  }
+
+  // --- HELPER: CONVERT AI MELODY TO MIDI NOTES ---
+  convertMelodyToMidi(events: MelodyEvent[]): MidiNote[] {
+      const midiNotes: MidiNote[] = [];
+      // MelodyEvent comes with Tone.js time notation "0:0:0"
+      
+      events.forEach(ev => {
+          const time = Tone.Time(ev.time).toSeconds();
+          const duration = Tone.Time(ev.duration).toSeconds();
+          const midi = Tone.Frequency(ev.note).toMidi();
+          
+          midiNotes.push({
+              note: ev.note,
+              midi: midi,
+              startTime: time,
+              duration: duration,
+              velocity: 0.9
+          });
+      });
+      return midiNotes;
   }
 
   // --- DEVICE MANAGEMENT ---
@@ -297,7 +361,13 @@ class AudioService {
       if (!this.isInitialized) this.initialize(); 
       this.previewSynth?.triggerAttackRelease(note, "8n"); 
   }
-  previewChord(chordName: string) { if (!this.isInitialized) this.initialize(); const notes = this.chordMap[chordName]; if (notes) this.previewSynth?.triggerAttackRelease(notes, "4n"); }
+  previewChord(chordName: string) { 
+      if (!this.isInitialized) this.initialize(); 
+      const cleanName = chordName.trim();
+      let notes = this.chordMap[cleanName] || [60, 64, 67];
+      const freqs = notes.map(m => Tone.Frequency(m, "midi").toNote());
+      this.previewSynth?.triggerAttackRelease(freqs, "4n"); 
+  }
 
   async addTrack(id: string, urlOrType: string, type: 'AUDIO' | 'INSTRUMENT' | 'DRUMS' | 'SAMPLER' = 'AUDIO'): Promise<void> {
     await this.initialize();
@@ -362,7 +432,8 @@ class AudioService {
   scheduleMidi(trackId: string, notes: MidiNote[]) {
       const ch = this.channels.get(trackId);
       if (!ch || !ch.synth) return;
-      if (this.activeParts.has(trackId)) { this.activeParts.get(trackId)?.dispose(); }
+      if (this.activeParts.has(trackId)) { this.activeParts.get(trackId)?.dispose(); this.activeParts.delete(trackId); }
+      
       const events = notes.map(n => ({ time: n.startTime, note: n.note, duration: n.duration, velocity: n.velocity }));
       const part = new Tone.Part((time, value) => { ch.synth?.triggerAttackRelease(value.note, value.duration, time, value.velocity); }, events).start(0);
       this.activeParts.set(trackId, part);
