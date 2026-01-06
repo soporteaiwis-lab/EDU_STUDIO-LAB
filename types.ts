@@ -11,7 +11,7 @@ export enum UserRole {
 }
 
 export const APP_INFO = {
-  version: '3.1.0 LMS-CL',
+  version: '3.2.0 LMS-CL',
   creator: 'Armin Wildo Salazar San Martin',
   company: 'AIWIS',
   year: '2025'
@@ -54,6 +54,7 @@ export interface MidiNote {
   startTime: number;
   duration: number;
   velocity: number;
+  label?: string; // New field for Chord Names or Drum labels
 }
 
 export interface Track {

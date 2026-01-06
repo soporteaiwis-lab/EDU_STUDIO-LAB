@@ -1,7 +1,8 @@
 
 import React, { memo, useState, useRef } from 'react';
 import { UserMode, LoopRegion } from '../types';
-import { Repeat, Flag } from 'lucide-react';
+import { Repeat } from 'lucide-react';
+import { audioService } from '../services/audioService';
 
 interface TimelineRulerProps {
   mode: UserMode;
@@ -16,23 +17,24 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   const [isDragging, setIsDragging] = useState<'START' | 'END' | 'NEW' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
 
-  const secondsPerBar = (60 / bpm) * 4; 
-  const pixelsPerSecond = 40 * zoom; 
-  const pixelsPerBar = secondsPerBar * pixelsPerSecond;
+  // Constants
+  const PIXELS_PER_SECOND = 40 * zoom; 
+  const SECONDS_PER_BAR = (60 / bpm) * 4; 
+  const PIXELS_PER_BAR = SECONDS_PER_BAR * PIXELS_PER_SECOND;
 
   // Calculate pixel positions for loop handles
-  const startPx = (loopRegion.startBar * pixelsPerBar);
-  const endPx = (loopRegion.endBar * pixelsPerBar);
+  const startPx = (loopRegion.startBar * PIXELS_PER_BAR);
+  const endPx = (loopRegion.endBar * PIXELS_PER_BAR);
   const widthPx = endPx - startPx;
 
   const getBarFromX = (x: number) => {
-     return Math.max(0, Math.floor(x / pixelsPerBar));
+     return Math.max(0, Math.floor(x / PIXELS_PER_BAR));
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!rulerRef.current) return;
     const rect = rulerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left; // Corrected: remove paddingLeft adjustment as it's relative
+    const x = e.clientX - rect.left;
     
     // Check if clicking near start or end handle (tolerance 15px)
     if (Math.abs(x - startPx) < 15 && loopRegion.isActive) {
@@ -40,10 +42,9 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
     } else if (Math.abs(x - endPx) < 15 && loopRegion.isActive) {
         setIsDragging('END');
     } else {
-        // Create new loop
-        const clickedBar = getBarFromX(x);
-        onLoopChange({ startBar: clickedBar, endBar: clickedBar + 1, isActive: true });
-        setIsDragging('NEW');
+        // SEEK LOGIC: Set Transport Time
+        const time = x / PIXELS_PER_SECOND;
+        audioService.setTime(Math.max(0, time));
     }
   };
 
@@ -59,10 +60,6 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
       } else if (isDragging === 'END') {
           const newEnd = Math.max(currentBar, loopRegion.startBar + 1);
           onLoopChange({ ...loopRegion, endBar: newEnd });
-      } else if (isDragging === 'NEW') {
-          if (currentBar >= loopRegion.startBar) {
-              onLoopChange({ ...loopRegion, endBar: currentBar + 1 });
-          }
       }
   };
 
@@ -72,14 +69,22 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   const markers = [];
   
   for (let i = 0; i < totalBars; i++) {
-      const leftPos = (i * pixelsPerBar);
+      const leftPos = (i * PIXELS_PER_BAR);
+      const timeInSeconds = i * SECONDS_PER_BAR;
+      const minutes = Math.floor(timeInSeconds / 60);
+      const seconds = Math.floor(timeInSeconds % 60);
+      const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
       markers.push(
           <div key={`bar-${i}`} className="absolute top-0 bottom-0 border-l border-white/20 pl-1.5 select-none h-full group" style={{ left: `${leftPos}px` }}>
-              <span className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-white">{i + 1}</span>
+              <div className="flex flex-col justify-between h-full py-1">
+                  <span className="text-[10px] font-mono font-bold text-gray-400 group-hover:text-white">{i + 1}</span>
+                  {i % 4 === 0 && <span className="text-[8px] font-mono text-gray-600 group-hover:text-gray-400">{timeLabel}</span>}
+              </div>
           </div>
       );
       if (zoom > 0.6) {
-        const beatWidth = pixelsPerBar / 4;
+        const beatWidth = PIXELS_PER_BAR / 4;
         for(let j=1; j<4; j++) {
              markers.push(
                 <div key={`beat-${i}-${j}`} className="absolute bottom-0 h-1.5 border-l border-gray-700" style={{ left: `${leftPos + (j * beatWidth)}px` }}></div>
@@ -91,14 +96,14 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
   return (
     <div 
         ref={rulerRef}
-        className="relative h-9 w-full bg-[#151515] overflow-hidden flex-shrink-0 cursor-ew-resize select-none border-b border-black"
+        className="relative h-10 w-full bg-[#151515] overflow-hidden flex-shrink-0 cursor-pointer select-none border-b border-black"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ minWidth: `${totalBars * pixelsPerBar}px` }} // Force width
+        style={{ minWidth: `${totalBars * PIXELS_PER_BAR}px` }} 
     >
-       <div className="absolute inset-0 pointer-events-none" style={{ width: `${totalBars * pixelsPerBar}px` }}>
+       <div className="absolute inset-0 pointer-events-none" style={{ width: `${totalBars * PIXELS_PER_BAR}px` }}>
           {markers}
        </div>
 
@@ -116,8 +121,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = memo(({ mode, bpm, zo
                </div>
                
                {/* Handles */}
-               <div className="absolute top-0 bottom-0 w-1 bg-green-500 cursor-ew-resize z-20 hover:brightness-150" style={{ left: `${startPx}px` }} title="Inicio Loop"></div>
-               <div className="absolute top-0 bottom-0 w-1 bg-red-500 cursor-ew-resize z-20 hover:brightness-150" style={{ left: `${endPx}px` }} title="Fin Loop"></div>
+               <div className="absolute top-0 bottom-0 w-2 bg-green-500 cursor-ew-resize z-20 hover:brightness-150 opacity-50 hover:opacity-100" style={{ left: `${startPx}px` }} title="Inicio Loop"></div>
+               <div className="absolute top-0 bottom-0 w-2 bg-red-500 cursor-ew-resize z-20 hover:brightness-150 opacity-50 hover:opacity-100" style={{ left: `${endPx}px` }} title="Fin Loop"></div>
            </>
        )}
     </div>

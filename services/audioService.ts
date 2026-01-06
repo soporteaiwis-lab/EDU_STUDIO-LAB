@@ -60,7 +60,6 @@ class AudioService {
   constructor() { }
 
   async initialize() {
-    // FORCE RESUME CONTEXT if suspended (Browsers block audio until gesture)
     if (Tone.context.state === 'suspended') {
         await Tone.context.resume();
     }
@@ -69,13 +68,10 @@ class AudioService {
     await Tone.start();
     
     if (!this.isInitialized) {
-        // Metronome
         this.metronomeSynth = new Tone.MembraneSynth({ pitchDecay: 0.008, octaves: 2, oscillator: { type: 'sine' } }).toDestination();
         this.metronomeClick = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination();
-        
         this.setMetronomeVolume(this.metronomeVolumeValue);
 
-        // Preview Synth (Fallback)
         this.previewSynth = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: "triangle" },
             envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
@@ -84,10 +80,7 @@ class AudioService {
 
         this.recorder = new Tone.Recorder();
         this.mic = new Tone.UserMedia();
-
-        // INIT MIDI
         this.initializeMidi();
-
         this.isInitialized = true;
     }
   }
@@ -95,7 +88,7 @@ class AudioService {
   setMetronomeVolume(db: number) {
       this.metronomeVolumeValue = db;
       if (this.metronomeSynth) this.metronomeSynth.volume.value = db;
-      if (this.metronomeClick) this.metronomeClick.volume.value = db - 5; // Click slightly quieter
+      if (this.metronomeClick) this.metronomeClick.volume.value = db - 5;
   }
 
   // --- HELPER: CONVERT AI CHORDS TO MIDI NOTES ---
@@ -104,35 +97,31 @@ class AudioService {
       const secondsPerBar = (60 / this.bpm) * 4;
 
       chords.forEach(chord => {
-          // Normalize chord name (remove extra spaces, handle basic inversions if needed later)
           const cleanName = chord.name.trim();
           let notes = this.chordMap[cleanName];
-          
-          // Fallback logic if exact chord not found (e.g., simplified triad)
           if (!notes) {
               const root = cleanName.charAt(0);
               const isMinor = cleanName.includes('m');
               if (this.chordMap[root + (isMinor?'m':'')]) {
                   notes = this.chordMap[root + (isMinor?'m':'')];
               } else {
-                  notes = [60, 64, 67]; // Default C Major if fails
+                  notes = [60, 64, 67]; 
               }
           }
 
-          // Move down one octave for harmony/pad feel
           const octaveShift = -12; 
-
           const startTime = (chord.bar - 1) * secondsPerBar;
-          // Default duration is 1 bar if not specified
           const duration = (chord.duration || 1) * secondsPerBar;
 
-          notes.forEach(midi => {
+          notes.forEach((midi, index) => {
               midiNotes.push({
                   note: Tone.Frequency(midi + octaveShift, "midi").toNote(),
                   midi: midi + octaveShift,
                   startTime: startTime,
                   duration: duration,
-                  velocity: 0.6
+                  velocity: 0.6,
+                  // Add label only to the root note (first in array usually) so it shows up nicely in the UI
+                  label: index === 0 ? cleanName : undefined
               });
           });
       });
@@ -142,7 +131,6 @@ class AudioService {
   // --- HELPER: CONVERT AI MELODY TO MIDI NOTES ---
   convertMelodyToMidi(events: MelodyEvent[]): MidiNote[] {
       const midiNotes: MidiNote[] = [];
-      // MelodyEvent comes with Tone.js time notation "0:0:0"
       
       events.forEach(ev => {
           const time = Tone.Time(ev.time).toSeconds();
@@ -157,6 +145,42 @@ class AudioService {
               velocity: 0.9
           });
       });
+      return midiNotes;
+  }
+
+  // --- HELPER: CONVERT AI RHYTHM TO MIDI NOTES ---
+  convertRhythmToMidi(events: DrumEvent[]): MidiNote[] {
+      const midiNotes: MidiNote[] = [];
+      // General MIDI Mapping
+      // Kick: 36 (C2), Snare: 38 (D2), HiHat: 42 (F#2)
+      const drumMap: Record<string, number> = {
+          'KICK': 36,
+          'SNARE': 38,
+          'HIHAT': 42
+      };
+
+      // Loop rhythm for at least 4 bars to make it useful
+      const loopCount = 2; 
+      const barDuration = (60 / this.bpm) * 4;
+
+      for (let i = 0; i < loopCount; i++) {
+          const offset = i * barDuration * 2; // AI returns 2 bars usually
+          
+          events.forEach(ev => {
+              const time = Tone.Time(ev.time).toSeconds() + offset;
+              const midi = drumMap[ev.instrument] || 42;
+              const note = Tone.Frequency(midi, "midi").toNote();
+              
+              midiNotes.push({
+                  note: note,
+                  midi: midi,
+                  startTime: time,
+                  duration: 0.1, // Hits are short
+                  velocity: ev.instrument === 'KICK' ? 1.0 : 0.8,
+                  label: ev.instrument
+              });
+          });
+      }
       return midiNotes;
   }
 
@@ -227,20 +251,31 @@ class AudioService {
   setSustain(enabled: boolean) { this.sustainEnabled = enabled; }
 
   async triggerMidiNoteOn(midiVal: number, velocity: number) {
-      // Ensure audio context is ready
       if (Tone.context.state !== 'running') await this.initialize();
 
       const noteName = Tone.Frequency(midiVal, "midi").toNote();
       if (this.onMidiNoteActive) this.onMidiNoteActive(midiVal, velocity);
       
       const now = Tone.now();
-      
-      // Try to play on active track, otherwise fallback to preview synth
       let played = false;
-      if (this.activeMidiTrackId) {
-          const ch = this.channels.get(this.activeMidiTrackId);
-          if (ch && ch.synth) {
-              ch.synth.triggerAttack(noteName, now, velocity);
+      
+      // Check for Drums
+      const activeTrack = this.activeMidiTrackId ? this.channels.get(this.activeMidiTrackId) : null;
+      
+      if (activeTrack) {
+          if (activeTrack.type === 'DRUMS' && activeTrack.drumSampler) {
+              // Map MIDI notes to Drum Samples
+              let sample = "HIHAT";
+              if (midiVal === 36) sample = "KICK";
+              if (midiVal === 38 || midiVal === 40) sample = "SNARE";
+              if (midiVal >= 42) sample = "HIHAT";
+              
+              if (activeTrack.drumSampler.has(sample)) {
+                  activeTrack.drumSampler.player(sample).start(now);
+                  played = true;
+              }
+          } else if (activeTrack.synth) {
+              activeTrack.synth.triggerAttack(noteName, now, velocity);
               played = true;
           }
       } 
@@ -259,7 +294,6 @@ class AudioService {
       if (this.onMidiNoteActive) this.onMidiNoteActive(midiVal, 0);
       const now = Tone.now();
       
-      // Determine where to release note
       const useTrackSynth = this.activeMidiTrackId && this.channels.get(this.activeMidiTrackId)?.synth;
 
       if (!this.sustainEnabled) {
@@ -270,7 +304,6 @@ class AudioService {
             this.previewSynth?.triggerRelease(noteName, now);
         }
       } else {
-          // Sustain logic: release later
           if (useTrackSynth) {
               const ch = this.channels.get(this.activeMidiTrackId!);
               ch?.synth?.triggerRelease(noteName, now + 1); 
@@ -295,7 +328,6 @@ class AudioService {
   getWaveformPath(id: string, width: number, height: number): string {
     const channel = this.channels.get(id);
     const player = channel?.player || channel?.sampler;
-    // Check loaded state specifically for Tone.Player
     if (!channel || !player || !(player as any).loaded) return "";
     try {
         const buffer = player.buffer;
@@ -310,9 +342,7 @@ class AudioService {
             if (datum < min) min = datum;
             if (datum > max) max = datum;
           }
-          // Simple clamping
           if(min < -1) min = -1; if(max > 1) max = 1;
-          
           path += `L ${i} ${(1 + min) * amp} `;
           path += `L ${i} ${(1 + max) * amp} `;
         }
@@ -328,7 +358,6 @@ class AudioService {
   setTimeSignature(numerator: number, denominator: number) {
       this.timeSignature = [numerator, denominator];
       Tone.Transport.timeSignature = [numerator, denominator];
-      // Restart metronome if running to apply changes
       if(this.metronomeLoop && this.metronomeLoop.state === 'started') {
           this.toggleMetronome(true);
       }
@@ -431,11 +460,31 @@ class AudioService {
   }
   scheduleMidi(trackId: string, notes: MidiNote[]) {
       const ch = this.channels.get(trackId);
-      if (!ch || !ch.synth) return;
-      if (this.activeParts.has(trackId)) { this.activeParts.get(trackId)?.dispose(); this.activeParts.delete(trackId); }
+      if (!ch) return;
       
-      const events = notes.map(n => ({ time: n.startTime, note: n.note, duration: n.duration, velocity: n.velocity }));
-      const part = new Tone.Part((time, value) => { ch.synth?.triggerAttackRelease(value.note, value.duration, time, value.velocity); }, events).start(0);
+      // Clean previous part
+      if (this.activeParts.has(trackId)) { 
+          this.activeParts.get(trackId)?.dispose(); 
+          this.activeParts.delete(trackId); 
+      }
+      
+      const events = notes.map(n => ({ time: n.startTime, note: n.note, duration: n.duration, velocity: n.velocity, midi: n.midi }));
+      
+      const part = new Tone.Part((time, value) => { 
+          if (ch.type === 'DRUMS' && ch.drumSampler) {
+              // Drum Trigger Logic
+              let sample = "HIHAT";
+              if (value.midi === 36) sample = "KICK";
+              if (value.midi === 38) sample = "SNARE";
+              if (ch.drumSampler.has(sample)) {
+                  ch.drumSampler.player(sample).start(time);
+              }
+          } else if (ch.synth) {
+              // Synth Trigger Logic
+              ch.synth.triggerAttackRelease(value.note, value.duration, time, value.velocity); 
+          }
+      }, events).start(0);
+      
       this.activeParts.set(trackId, part);
   }
   scheduleChords(trackId: string, chords: ChordEvent[]) {}

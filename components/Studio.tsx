@@ -253,7 +253,8 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                 if (t.midiNotes) audioService.scheduleMidi(t.id, t.midiNotes);
             }
             if ((t.type === 'RHYTHM' || t.type === 'DRUMS') && t.rhythmData) {
-                audioService.scheduleDrums(t.id, t.rhythmData);
+                // Ensure proper scheduler is called if using old rhythm data
+                // But generally now we convert to midiNotes
             }
         });
         audioService.play(); 
@@ -659,14 +660,16 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
         {showCreative && <CreativeEditor onClose={() => setShowCreative(false)} onImportLyrics={(t)=>setMetadata(p=>({...p,lyrics:t}))} 
             onImportChords={(d)=>{
                 const id=Date.now().toString();
-                // CONVERT AI CHORDS TO MIDI NOTES
+                // CONVERT AI CHORDS TO MIDI NOTES WITH LABELS
                 const notes = audioService.convertChordsToMidi(d.progression);
                 setTracks(p=>[...p,{id,name:`Acordes ${d.key}`,type:'CHORD',instrument:'CHORD',color:'bg-blue-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,chordData:d.progression, midiNotes: notes}]);
                 audioService.addTrack(id,'','INSTRUMENT');
             }} 
             onImportRhythm={(d)=>{
                 const id=Date.now().toString();
-                setTracks(p=>[...p,{id,name:`Batería ${d.style}`,type:'RHYTHM',instrument:'DRUMS',color:'bg-red-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,rhythmData:d.events}]);
+                // NEW: CONVERT AI RHYTHM TO MIDI NOTES
+                const notes = audioService.convertRhythmToMidi(d.events);
+                setTracks(p=>[...p,{id,name:`Batería ${d.style}`,type:'RHYTHM',instrument:'DRUMS',color:'bg-red-400',volume:80,pan:0,eq:{low:0,mid:0,high:0},effects:{reverb:0,pitch:0,distortion:0},isMuted:false,isSolo:false,isArmed:false,rhythmData:d.events, midiNotes: notes}]);
                 audioService.addTrack(id,'','DRUMS');
             }} 
             onImportMelody={(d)=>{

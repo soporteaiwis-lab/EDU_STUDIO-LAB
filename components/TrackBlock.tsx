@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Track, UserMode } from '../types';
-import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick,  Activity, Edit3, Volume2, MoveHorizontal } from 'lucide-react';
+import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick,  Activity, Edit3, Volume2 } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 interface TrackBlockProps {
@@ -28,7 +28,7 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
   const PIXELS_PER_SECOND = 40 * zoom; 
 
   // Determine if this is a MIDI-based track (Notes) or Audio-based (Waveform)
-  const isMidiTrack = ['MIDI', 'CHORD', 'MELODY'].includes(track.type);
+  const isMidiTrack = ['MIDI', 'CHORD', 'MELODY', 'RHYTHM', 'DRUMS'].includes(track.type);
 
   useEffect(() => {
     const generate = () => {
@@ -89,15 +89,22 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
 
               {/* Render Notes (Handles AI Chords/Melodies too) */}
               {track.midiNotes?.map((note, i) => (
-                  <div key={i} className={`absolute ${noteColor} rounded-md shadow-sm border`}
+                  <div key={i} className={`absolute ${noteColor} rounded-md shadow-sm border flex items-center justify-center overflow-hidden`}
                     style={{
                         left: `${note.startTime * PIXELS_PER_SECOND}px`,
-                        width: `${Math.max(6, note.duration * PIXELS_PER_SECOND)}px`,
-                        top: `${Math.max(0, 100 - (note.midi - 36))}px`, 
-                        height: '8px'
+                        width: `${Math.max(10, note.duration * PIXELS_PER_SECOND)}px`,
+                        top: `${Math.max(0, 100 - (note.midi - 36) * 2)}px`, 
+                        height: '16px'
                     }}
                     title={`${note.note} (Vel: ${note.velocity})`}
-                  />
+                  >
+                      {/* Show Chord Name or Label if exists */}
+                      {note.label && (
+                          <span className="text-[10px] font-bold text-white drop-shadow-md truncate px-1 bg-black/20 rounded">
+                              {note.label}
+                          </span>
+                      )}
+                  </div>
               ))}
               
               {/* Overlay for interaction hint */}
@@ -114,7 +121,6 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
 
   const renderAudioContent = () => {
       const isExplorer = mode === UserMode.EXPLORER;
-      // Basic logic to get a hex roughly from tailwind name for stroke, or fallback to dark gray
       const strokeColor = isExplorer ? "#374151" : "rgba(255,255,255,0.8)";
       
       return (
