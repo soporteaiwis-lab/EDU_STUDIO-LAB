@@ -54,7 +54,12 @@ class AudioService {
       'F': [65, 69, 72], 'Fm': [65, 68, 72], 'Fmaj7': [65, 69, 72, 76],
       'G': [67, 71, 74], 'Gm': [67, 70, 74], 'G7': [67, 71, 74, 77],
       'A': [69, 73, 76], 'Am': [69, 72, 76], 'Am7': [69, 72, 76, 79],
-      'B': [71, 75, 78], 'Bm': [71, 74, 78], 'Bdim': [71, 74, 77]
+      'B': [71, 75, 78], 'Bm': [71, 74, 78], 'Bdim': [71, 74, 77],
+      'Bb': [58, 62, 65], 'Bbm': [58, 61, 65],
+      'Eb': [63, 67, 70], 'Ebm': [63, 66, 70],
+      'Ab': [68, 72, 75], 'Abm': [68, 71, 75],
+      'Db': [61, 65, 68], 
+      'F#': [66, 70, 73], 'Gb': [66, 70, 73]
   };
 
   constructor() { }
@@ -97,30 +102,41 @@ class AudioService {
       const secondsPerBar = (60 / this.bpm) * 4;
 
       chords.forEach(chord => {
-          const cleanName = chord.name.trim();
+          const cleanName = chord.name.trim(); // American Key Label (e.g., "Am", "G7")
+          
           let notes = this.chordMap[cleanName];
           if (!notes) {
+              // Simple Fallback logic if dictionary fails
               const root = cleanName.charAt(0);
               const isMinor = cleanName.includes('m');
-              if (this.chordMap[root + (isMinor?'m':'')]) {
-                  notes = this.chordMap[root + (isMinor?'m':'')];
+              const lookup = root + (isMinor ? 'm' : '');
+              if (this.chordMap[lookup]) {
+                  notes = this.chordMap[lookup];
               } else {
-                  notes = [60, 64, 67]; 
+                  notes = [60, 64, 67]; // Default C Major
               }
           }
 
-          const octaveShift = -12; 
+          const octaveShift = -12; // Shift down for better accompaniment range
+          
+          // STRICT GRID ALIGNMENT
+          // Start exactly at the beginning of the assigned bar
           const startTime = (chord.bar - 1) * secondsPerBar;
-          const duration = (chord.duration || 1) * secondsPerBar;
+          
+          // DURATION CALCULATION WITH GAP
+          // Calculate strict duration based on bars
+          const strictDuration = (chord.duration || 1) * secondsPerBar;
+          // Reduce duration slightly (95%) to prevent overlap/crossing ("No sustain")
+          const actualDuration = strictDuration * 0.95; 
 
           notes.forEach((midi, index) => {
               midiNotes.push({
                   note: Tone.Frequency(midi + octaveShift, "midi").toNote(),
                   midi: midi + octaveShift,
                   startTime: startTime,
-                  duration: duration,
-                  velocity: 0.6,
-                  // Add label only to the root note (first in array usually) so it shows up nicely in the UI
+                  duration: actualDuration,
+                  velocity: 0.65,
+                  // Assign American Key label ONLY to the root note (index 0) so it's readable
                   label: index === 0 ? cleanName : undefined
               });
           });
@@ -141,7 +157,7 @@ class AudioService {
               note: ev.note,
               midi: midi,
               startTime: time,
-              duration: duration,
+              duration: duration, // Melody can be more legato
               velocity: 0.9
           });
       });
@@ -151,20 +167,17 @@ class AudioService {
   // --- HELPER: CONVERT AI RHYTHM TO MIDI NOTES ---
   convertRhythmToMidi(events: DrumEvent[]): MidiNote[] {
       const midiNotes: MidiNote[] = [];
-      // General MIDI Mapping
-      // Kick: 36 (C2), Snare: 38 (D2), HiHat: 42 (F#2)
       const drumMap: Record<string, number> = {
           'KICK': 36,
           'SNARE': 38,
           'HIHAT': 42
       };
 
-      // Loop rhythm for at least 4 bars to make it useful
-      const loopCount = 2; 
+      const loopCount = 4; // Extend loop for 8 bars usually
       const barDuration = (60 / this.bpm) * 4;
 
       for (let i = 0; i < loopCount; i++) {
-          const offset = i * barDuration * 2; // AI returns 2 bars usually
+          const offset = i * barDuration * 2; 
           
           events.forEach(ev => {
               const time = Tone.Time(ev.time).toSeconds() + offset;
@@ -175,7 +188,7 @@ class AudioService {
                   note: note,
                   midi: midi,
                   startTime: time,
-                  duration: 0.1, // Hits are short
+                  duration: 0.1, 
                   velocity: ev.instrument === 'KICK' ? 1.0 : 0.8,
                   label: ev.instrument
               });
@@ -259,12 +272,10 @@ class AudioService {
       const now = Tone.now();
       let played = false;
       
-      // Check for Drums
       const activeTrack = this.activeMidiTrackId ? this.channels.get(this.activeMidiTrackId) : null;
       
       if (activeTrack) {
           if (activeTrack.type === 'DRUMS' && activeTrack.drumSampler) {
-              // Map MIDI notes to Drum Samples
               let sample = "HIHAT";
               if (midiVal === 36) sample = "KICK";
               if (midiVal === 38 || midiVal === 40) sample = "SNARE";
@@ -462,7 +473,6 @@ class AudioService {
       const ch = this.channels.get(trackId);
       if (!ch) return;
       
-      // Clean previous part
       if (this.activeParts.has(trackId)) { 
           this.activeParts.get(trackId)?.dispose(); 
           this.activeParts.delete(trackId); 
@@ -472,7 +482,6 @@ class AudioService {
       
       const part = new Tone.Part((time, value) => { 
           if (ch.type === 'DRUMS' && ch.drumSampler) {
-              // Drum Trigger Logic
               let sample = "HIHAT";
               if (value.midi === 36) sample = "KICK";
               if (value.midi === 38) sample = "SNARE";
@@ -480,7 +489,6 @@ class AudioService {
                   ch.drumSampler.player(sample).start(time);
               }
           } else if (ch.synth) {
-              // Synth Trigger Logic
               ch.synth.triggerAttackRelease(value.note, value.duration, time, value.velocity); 
           }
       }, events).start(0);

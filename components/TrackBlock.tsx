@@ -89,20 +89,24 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
 
               {/* Render Notes (Handles AI Chords/Melodies too) */}
               {track.midiNotes?.map((note, i) => (
-                  <div key={i} className={`absolute ${noteColor} rounded-md shadow-sm border flex items-center justify-center overflow-hidden`}
+                  <div key={i} className={`absolute ${noteColor} rounded-sm shadow-sm border flex items-center justify-center overflow-hidden`}
                     style={{
                         left: `${note.startTime * PIXELS_PER_SECOND}px`,
                         width: `${Math.max(10, note.duration * PIXELS_PER_SECOND)}px`,
+                        // Adjust visual height based on type. Chords look better as solid blocks.
                         top: `${Math.max(0, 100 - (note.midi - 36) * 2)}px`, 
-                        height: '16px'
+                        height: '16px',
+                        zIndex: note.label ? 20 : 10
                     }}
                     title={`${note.note} (Vel: ${note.velocity})`}
                   >
-                      {/* Show Chord Name or Label if exists */}
+                      {/* Show Chord Name or Label prominently */}
                       {note.label && (
-                          <span className="text-[10px] font-bold text-white drop-shadow-md truncate px-1 bg-black/20 rounded">
-                              {note.label}
-                          </span>
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
+                              <span className="text-[10px] font-black tracking-tighter truncate px-1">
+                                  {note.label}
+                              </span>
+                          </div>
                       )}
                   </div>
               ))}
