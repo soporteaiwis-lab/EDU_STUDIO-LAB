@@ -38,7 +38,7 @@ const INITIAL_METADATA: SongMetadata = {
     lyrics: ''
 };
 
-const HEADER_WIDTH = 260; 
+const HEADER_WIDTH = 320; // Increased to accommodate wider Explorer header (was 260)
 
 export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }) => {
   const [tracks, setTracks] = useState<Track[]>(INITIAL_TRACKS);
@@ -98,6 +98,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const selectedTrack = tracks.find(t => t.id === selectedTrackId);
   const editingTrack = tracks.find(t => t.id === editingMidiTrackId);
   const showPianoPanel = (selectedTrack?.type === 'MIDI' || selectedTrack?.type === 'CHORD' || selectedTrack?.type === 'MELODY') && !editingMidiTrackId;
+
+  // Header Width changes based on mode
+  const currentHeaderWidth = isExplorer ? 320 : 260;
 
   // --- DYNAMIC TIMELINE CALCULATION ---
   useEffect(() => {
@@ -188,13 +191,13 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
       if (playheadRef.current) {
         const time = audioService.getCurrentTime();
         const pixelsPerSecond = 40 * zoom; 
-        playheadRef.current.style.transform = `translateX(${HEADER_WIDTH + (time * pixelsPerSecond)}px)`;
+        playheadRef.current.style.transform = `translateX(${currentHeaderWidth + (time * pixelsPerSecond)}px)`;
       }
       animationRef.current = requestAnimationFrame(animate);
     };
     animationRef.current = requestAnimationFrame(animate);
     return () => { if(animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [zoom]); 
+  }, [zoom, currentHeaderWidth]); 
 
   const handleTapTempo = () => {
       const now = Date.now();
@@ -215,7 +218,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
 
   const handleFitToScreen = () => {
       if (!timelineContainerRef.current) return;
-      const availableWidth = timelineContainerRef.current.clientWidth - HEADER_WIDTH;
+      const availableWidth = timelineContainerRef.current.clientWidth - currentHeaderWidth;
       const secondsPerBar = (60 / bpm) * 4;
       const totalSeconds = totalBars * secondsPerBar;
       const newZoom = availableWidth / (totalSeconds * 40);
@@ -263,9 +266,9 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
     const rect = timelineContainerRef.current?.getBoundingClientRect();
     if (rect) {
         let x = e.clientX - rect.left + (timelineContainerRef.current?.scrollLeft || 0);
-        if (x < HEADER_WIDTH) x = HEADER_WIDTH;
+        if (x < currentHeaderWidth) x = currentHeaderWidth;
         const pixelsPerSecond = 40 * zoom;
-        let time = (x - HEADER_WIDTH) / pixelsPerSecond;
+        let time = (x - currentHeaderWidth) / pixelsPerSecond;
         if (snapEnabled) {
             const beatDuration = 60 / bpm;
             const barDuration = beatDuration * 4; 
@@ -354,28 +357,31 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
   const gridLines = useMemo(() => {
     const lines = [];
     const pixelsPerBar = (60 / bpm) * 4 * (40 * zoom);
+    // Grid line color depending on mode for better contrast
+    const lineColor = isExplorer ? 'border-gray-800/10' : 'border-white/5';
+
     for(let i=0; i<totalBars; i++) {
         lines.push(
-            <div key={`bar-${i}`} className="absolute top-0 bottom-0 w-px border-l border-white/5 pointer-events-none" style={{left: `${HEADER_WIDTH + (i * pixelsPerBar)}px`}}></div>
+            <div key={`bar-${i}`} className={`absolute top-0 bottom-0 w-px border-l ${lineColor} pointer-events-none`} style={{left: `${currentHeaderWidth + (i * pixelsPerBar)}px`}}></div>
         );
         if(zoom > 0.8) {
              for(let j=1; j<4; j++) {
-                 lines.push(<div key={`beat-${i}-${j}`} className="absolute top-0 bottom-0 w-px border-l border-white/5 border-dotted pointer-events-none" style={{left: `${HEADER_WIDTH + (i * pixelsPerBar) + (j * (pixelsPerBar/4))}px`}}></div>);
+                 lines.push(<div key={`beat-${i}-${j}`} className={`absolute top-0 bottom-0 w-px border-l ${lineColor} border-dotted pointer-events-none`} style={{left: `${currentHeaderWidth + (i * pixelsPerBar) + (j * (pixelsPerBar/4))}px`}}></div>);
              }
         }
     }
     // END MARKER
     lines.push(
-        <div key="end-marker" className="absolute top-0 bottom-0 w-1 bg-red-500/50 z-20 pointer-events-none flex items-end pb-2 pl-1" style={{left: `${HEADER_WIDTH + (totalBars * pixelsPerBar)}px`}}>
+        <div key="end-marker" className="absolute top-0 bottom-0 w-1 bg-red-500/50 z-20 pointer-events-none flex items-end pb-2 pl-1" style={{left: `${currentHeaderWidth + (totalBars * pixelsPerBar)}px`}}>
             <span className="text-[10px] text-red-400 font-bold -rotate-90 origin-bottom-left whitespace-nowrap">FIN CANCIÓN</span>
         </div>
     );
     return lines;
-  }, [bpm, zoom, totalBars]);
+  }, [bpm, zoom, totalBars, currentHeaderWidth, isExplorer]);
 
   // Important: We calculate track width dynamically to ensure content is reachable
   const trackContentWidth = (totalBars * (60 / bpm) * 4 * (40 * zoom)) + 100;
-  const totalContainerWidth = HEADER_WIDTH + trackContentWidth;
+  const totalContainerWidth = currentHeaderWidth + trackContentWidth;
 
   // Execute AI Suggestion
   const applyProducerAdvice = () => {
@@ -550,25 +556,25 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                 <Inspector track={tracks.find(t => t.id === selectedTrackId)} mode={userMode} onUpdate={(id, up) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...up } : t))} onClose={() => setSelectedTrackId(null)} />
             )}
             
-            <div className="flex-1 flex flex-col min-w-0 relative h-full bg-[#080808]">
-                <div ref={timelineContainerRef} className="flex-1 overflow-auto relative scroll-smooth bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] custom-scrollbar">
-                     <div className="sticky top-0 z-30 w-fit bg-[#080808]">
-                        <TimelineRuler mode={userMode} bpm={bpm} zoom={zoom} paddingLeft={HEADER_WIDTH} loopRegion={loopRegion} onLoopChange={setLoopRegion} totalBars={totalBars} />
+            <div className={`flex-1 flex flex-col min-w-0 relative h-full ${isExplorer ? 'bg-gray-200' : 'bg-[#080808]'}`}>
+                <div ref={timelineContainerRef} className={`flex-1 overflow-auto relative scroll-smooth custom-scrollbar ${isExplorer ? '' : "bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"}`}>
+                     <div className={`sticky top-0 z-30 w-fit ${isExplorer ? 'bg-gray-200' : 'bg-[#080808]'}`}>
+                        <TimelineRuler mode={userMode} bpm={bpm} zoom={zoom} paddingLeft={currentHeaderWidth} loopRegion={loopRegion} onLoopChange={setLoopRegion} totalBars={totalBars} />
                      </div>
 
                      {/* Tracks Container with Dynamic Width */}
                      <div className="relative pb-32" style={{ width: `${totalContainerWidth}px`, minWidth: '100%' }}>
                          <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">{gridLines}</div>
-                         <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${HEADER_WIDTH}px)` }}>
+                         <div ref={playheadRef} className="absolute top-0 bottom-0 w-[1px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] z-40 pointer-events-none transition-transform duration-75 will-change-transform" style={{ left: '0px', transform: `translateX(${currentHeaderWidth}px)` }}>
                              <div className="w-5 h-5 -ml-[9px] bg-cyan-400 transform rotate-45 -mt-2.5 shadow-md flex items-center justify-center border border-white">
                                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                              </div>
                          </div>
                          {loopRegion.isActive && (
-                             <div className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0" style={{ left: HEADER_WIDTH + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom }}></div>
+                             <div className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none border-x border-green-500/30 z-0" style={{ left: currentHeaderWidth + (loopRegion.startBar * (60/bpm) * 4 * 40 * zoom), width: (loopRegion.endBar - loopRegion.startBar) * (60/bpm) * 4 * 40 * zoom }}></div>
                          )}
 
-                         <div className="relative z-10 pt-2 space-y-1">
+                         <div className="relative z-10 pt-4 px-4 space-y-3">
                             {tracks.map(track => (
                                 <TrackBlock key={track.id} track={{...track, isSelected: track.id === selectedTrackId}} mode={userMode} bpm={bpm} zoom={zoom} totalWidth={trackContentWidth}
                                     onVolumeChange={(id, v) => {setTracks(prev => prev.map(t => t.id === id ? { ...t, volume: v } : t)); audioService.setVolume(id, v);}} 
@@ -583,7 +589,7 @@ export const Studio: React.FC<StudioProps> = ({ userMode, onModeChange, onExit }
                             ))}
                          </div>
 
-                         <div className="mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: HEADER_WIDTH }}>
+                         <div className="mt-8 p-4 flex justify-center w-fit" style={{ marginLeft: currentHeaderWidth }}>
                              <button onClick={() => setImportModal(true)} className="bg-white/5 text-gray-400 px-8 py-3 rounded-full text-sm font-bold flex items-center hover:bg-white/10 hover:text-white border border-dashed border-white/10 hover:border-white/30 transition-all"><Plus size={16} className="mr-2"/> Nueva Pista</button>
                         </div>
                      </div>

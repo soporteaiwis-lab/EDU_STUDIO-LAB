@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Track, UserMode } from '../types';
-import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick,  Activity, Edit3 } from 'lucide-react';
+import { Mic, Music, Trash2, CircleDot, Drum, Guitar, Keyboard, Wind, Zap, Piano, Grid, MousePointerClick,  Activity, Edit3, Volume2, MoveHorizontal } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 interface TrackBlockProps {
@@ -30,18 +31,24 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
     const generate = () => {
        if (containerRef.current && (track.type === 'AUDIO' || track.type === 'SAMPLER')) {
           const width = containerRef.current.clientWidth;
-          const height = mode === UserMode.EXPLORER ? 120 : 80; 
+          const height = mode === UserMode.EXPLORER ? 140 : 80; // Taller waveform in Explorer
           const path = audioService.getWaveformPath(track.id, width, height);
           setWaveformPath(path);
        }
     };
-    const interval = setInterval(generate, 1000); 
+    const interval = setInterval(generate, 500); // Faster refresh for smoother recording visual
     return () => clearInterval(interval);
   }, [track.id, track.audioUrl, track.samplerUrl, mode, track.type, zoom]);
 
   const getIcon = () => {
-    const size = mode === UserMode.EXPLORER ? 32 : 16;
-    const props = { size, className: "text-gray-300" };
+    const size = mode === UserMode.EXPLORER ? 40 : 18;
+    // Dynamic color for icon based on track color
+    const colorClass = mode === UserMode.EXPLORER 
+        ? track.color.replace('bg-', 'text-').replace('600', '600').replace('500', '600') 
+        : "text-gray-300";
+        
+    const props = { size, className: colorClass };
+    
     switch (track.instrument) {
         case 'DRUMS': return <Drum {...props} />;
         case 'GUITAR': case 'BASS': return <Guitar {...props} />;
@@ -55,110 +62,188 @@ export const TrackBlock: React.FC<TrackBlockProps> = ({ track, mode, bpm, zoom, 
     }
   };
 
-  const isSelectedClass = track.isSelected ? 'ring-2 ring-cyan-500 z-10 bg-[#2f2f2f]' : '';
-  const stickyHeaderStyle = "sticky left-0 z-20 shadow-r-md";
+  const isSelectedClass = track.isSelected 
+    ? (mode === UserMode.EXPLORER ? 'ring-4 ring-cyan-400 transform scale-[1.01] z-20 shadow-xl' : 'ring-2 ring-cyan-500 z-10 bg-[#2f2f2f]') 
+    : '';
+  
+  const stickyHeaderStyle = "sticky left-0 z-20 shadow-xl";
 
   // --- CONTENT RENDERERS ---
 
   const renderMidiContent = () => {
+      // Light theme for Explorer MIDI
+      const bgClass = mode === UserMode.EXPLORER ? "bg-white" : "bg-[#181818]";
+      const gridColor = mode === UserMode.EXPLORER ? "border-gray-100" : "border-white/5";
+      const noteColor = mode === UserMode.EXPLORER ? "bg-cyan-500 border-cyan-600" : "bg-cyan-500/80 border-cyan-300";
+
       return (
-          <div className="relative w-full h-full bg-[#181818] overflow-hidden group" onDoubleClick={() => onEditMidi && onEditMidi(track.id)}>
-              {/* Subtle bar lines inside the track */}
+          <div className={`relative w-full h-full ${bgClass} overflow-hidden group border-l border-gray-200`} onDoubleClick={() => onEditMidi && onEditMidi(track.id)}>
+              {/* Grid Lines */}
               {Array.from({length: 50}).map((_, i) => (
-                  <div key={i} className="absolute top-0 bottom-0 border-l border-white/5" style={{ left: `${i * ((60/bpm)*4 * PIXELS_PER_SECOND)}px` }}></div>
+                  <div key={i} className={`absolute top-0 bottom-0 border-l ${gridColor}`} style={{ left: `${i * ((60/bpm)*4 * PIXELS_PER_SECOND)}px` }}>
+                      {mode === UserMode.EXPLORER && <span className="text-[9px] text-gray-300 ml-1">{i+1}</span>}
+                  </div>
               ))}
 
               {track.midiNotes?.map((note, i) => (
-                  <div key={i} className="absolute bg-cyan-500/80 border border-cyan-300 rounded-sm shadow-sm"
+                  <div key={i} className={`absolute ${noteColor} rounded-md shadow-sm border`}
                     style={{
                         left: `${note.startTime * PIXELS_PER_SECOND}px`,
-                        width: `${Math.max(4, note.duration * PIXELS_PER_SECOND)}px`,
+                        width: `${Math.max(6, note.duration * PIXELS_PER_SECOND)}px`,
                         top: `${Math.max(0, 100 - (note.midi - 36))}px`, 
-                        height: '6px'
+                        height: '8px'
                     }}
                   />
               ))}
-              {/* Overlay Button for Edit - Visible in all modes if hovered */}
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-                  <button onClick={(e) => {e.stopPropagation(); if(onEditMidi) onEditMidi(track.id)}} className="bg-cyan-600 text-white text-xs px-2 py-1 rounded shadow flex items-center hover:bg-cyan-500">
-                      <Edit3 size={12} className="mr-1"/> Editar MIDI
-                  </button>
-              </div>
+              
+              {/* Botón Editar grande para niños */}
+              {mode === UserMode.EXPLORER && (
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-white/50 transition-opacity backdrop-blur-sm">
+                    <button onClick={(e) => {e.stopPropagation(); if(onEditMidi) onEditMidi(track.id)}} className="bg-cyan-600 text-white text-sm font-bold px-6 py-3 rounded-full shadow-lg flex items-center hover:bg-cyan-700 hover:scale-105 transition-all">
+                        <Edit3 size={18} className="mr-2"/> Abrir Piano
+                    </button>
+                </div>
+              )}
           </div>
       );
   };
 
-  const renderAudioContent = () => (
-     <div className={`relative h-full w-full flex items-center justify-center opacity-90 z-10 ${track.color.replace('bg-', 'bg-opacity-20 ')}`}>
-         {/* Vertical Grid Lines for alignment visual */}
-         {Array.from({length: 50}).map((_, i) => (
-              <div key={i} className="absolute top-0 bottom-0 border-l border-white/10 pointer-events-none" style={{ left: `${i * ((60/bpm)*4 * PIXELS_PER_SECOND)}px` }}></div>
-         ))}
-         
-         {waveformPath && (
-             <svg height={80} width="100%" preserveAspectRatio="none" className="w-full h-full absolute inset-0">
-                 <path d={waveformPath} fill="none" stroke="rgba(0,0,0,0.6)" strokeWidth="3" strokeLinecap="round" />
-                 <path d={waveformPath} fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1" strokeLinecap="round" />
-             </svg>
-         )}
-         {!waveformPath && track.audioUrl && <span className="text-xs opacity-50 animate-pulse relative z-10 bg-black/50 px-2 rounded">Cargando Onda...</span>}
-     </div>
-  );
+  const renderAudioContent = () => {
+      // High contrast colors for Explorer
+      const isExplorer = mode === UserMode.EXPLORER;
+      const waveColor = isExplorer ? track.color.replace('bg-', '#').replace('600', '').replace('500', '') : "rgba(255,255,255,0.8)"; 
+      // Basic logic to get a hex roughly from tailwind name for stroke, or fallback to dark gray
+      const strokeColor = isExplorer ? "#374151" : "rgba(255,255,255,0.8)";
+      
+      return (
+        <div className={`relative h-full w-full flex items-center justify-center z-10 ${isExplorer ? 'bg-white' : track.color.replace('bg-', 'bg-opacity-20 ')}`}>
+            {/* Grid Lines */}
+            {Array.from({length: 50}).map((_, i) => (
+                    <div key={i} className={`absolute top-0 bottom-0 border-l pointer-events-none ${isExplorer ? 'border-gray-100' : 'border-white/10'}`} style={{ left: `${i * ((60/bpm)*4 * PIXELS_PER_SECOND)}px` }}></div>
+            ))}
+            
+            {waveformPath && (
+                <svg height={isExplorer ? 140 : 80} width="100%" preserveAspectRatio="none" className="w-full h-full absolute inset-0">
+                    {/* Shadow/Depth Line */}
+                    {isExplorer && <path d={waveformPath} fill="none" stroke="rgba(0,0,0,0.1)" strokeWidth="4" strokeLinecap="round" transform="translate(1, 2)" />}
+                    {/* Main Line */}
+                    <path d={waveformPath} fill="none" stroke={isExplorer ? strokeColor : "rgba(255,255,255,0.8)"} strokeWidth={isExplorer ? "3" : "1"} strokeLinecap="round" />
+                </svg>
+            )}
+            {!waveformPath && track.audioUrl && (
+                <div className="flex flex-col items-center animate-pulse opacity-50">
+                    <Activity size={24} className="text-gray-400 mb-2"/>
+                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">Procesando Audio...</span>
+                </div>
+            )}
+            
+            {/* Visual Indicator for "Empty & Armed" */}
+            {track.isArmed && !track.audioUrl && isExplorer && (
+                <div className="absolute inset-0 bg-red-50/50 flex items-center justify-center border-2 border-dashed border-red-200 m-2 rounded-xl">
+                    <div className="text-red-300 font-bold text-lg flex items-center">
+                        <Mic className="mr-2 animate-bounce"/> Esperando grabación...
+                    </div>
+                </div>
+            )}
+        </div>
+      );
+  };
 
-  const containerClass = mode === UserMode.EXPLORER ? "h-32 mb-4 rounded-2xl shadow-md border-4 border-white/30" : "bg-[#2a2a2a] border-b border-black h-28";
+  const containerClass = mode === UserMode.EXPLORER ? "h-40 mb-6 rounded-3xl shadow-md border-4 border-white transition-all bg-white" : "bg-[#2a2a2a] border-b border-black h-28";
   
-  // Style to enforce width for scrolling
   const widthStyle = totalWidth ? { width: `${totalWidth}px` } : { minWidth: '100%' };
 
-  // Explorer Mode (BASIC)
+  // --- EXPLORER MODE (DIDACTIC DESIGN) ---
   if (mode === UserMode.EXPLORER) {
+      // Calculate specific colors for the card header background based on track color
+      // We map the tailwind bg color to a very light version for the header bg
+      let headerBg = "bg-gray-50";
+      if(track.color.includes('rose') || track.color.includes('red')) headerBg = "bg-red-50";
+      if(track.color.includes('blue') || track.color.includes('cyan') || track.color.includes('sky')) headerBg = "bg-blue-50";
+      if(track.color.includes('green') || track.color.includes('emerald')) headerBg = "bg-green-50";
+      if(track.color.includes('yellow') || track.color.includes('amber') || track.color.includes('orange')) headerBg = "bg-orange-50";
+      if(track.color.includes('purple') || track.color.includes('violet')) headerBg = "bg-purple-50";
+
       return (
         <div 
-            onClick={() => onSelect(track.id)} // IMPORTANT: Select track on click to show Piano
-            className={`flex w-full ${containerClass} ${track.color} overflow-hidden relative shrink-0 transition-transform ${track.isSelected ? 'scale-[1.01] ring-4 ring-cyan-400' : 'hover:scale-[1.005]'}`}
+            onClick={() => onSelect(track.id)} 
+            className={`flex w-full ${containerClass} overflow-hidden relative shrink-0 cursor-pointer ${isSelectedClass}`}
         >
-            <div className={`w-72 ${stickyHeaderStyle} bg-black/10 backdrop-blur-sm flex flex-col items-center justify-center border-r-4 border-white/20 p-2 flex-shrink-0 relative`}>
+            {/* HEADER PANEL (Control Station) */}
+            <div className={`w-80 ${stickyHeaderStyle} ${headerBg} flex flex-col border-r-2 border-gray-100 flex-shrink-0 relative`}>
                 
-                <div className="flex w-full items-center justify-between px-2 mb-2">
-                    <div className="bg-white/20 p-2 rounded-full">{getIcon()}</div>
+                {/* Top Row: Icon + Name + Delete (CORNERED) */}
+                <div className="flex items-center justify-between p-3 pb-1">
+                    <div className="flex items-center space-x-3 overflow-hidden">
+                        <div className="bg-white p-2.5 rounded-2xl shadow-sm border border-gray-100">
+                            {getIcon()}
+                        </div>
+                        <h3 className="font-fredoka text-xl font-bold text-gray-700 truncate" title={track.name}>{track.name}</h3>
+                    </div>
                     
+                    {/* DELETE BUTTON: Top Right Corner, distinctly separated */}
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onDelete(track.id) }} 
+                        className="p-2 rounded-xl text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+                        title="Eliminar Pista"
+                    >
+                        <Trash2 size={20}/>
+                    </button>
+                </div>
+
+                {/* Middle Row: Primary Actions (REC / MUTE / SOLO) */}
+                <div className="flex-1 flex items-center justify-between px-4 py-2">
+                    {/* Record Button - Prominent & Centered if possible */}
                     {track.type !== 'CHORD' && (
-                        <div className="flex flex-col items-center">
+                        <div className="flex flex-col items-center justify-center w-full">
                             <button 
                                 onClick={(e) => {e.stopPropagation(); onToggleArm(track.id);}} 
-                                className={`p-3 rounded-full border-4 shadow-xl transition-all hover:scale-105 active:scale-95 ${track.isArmed ? 'bg-red-600 border-red-200 animate-pulse text-white shadow-red-500/50' : 'bg-gray-200 border-gray-400 text-gray-500 hover:bg-white hover:text-red-500'}`}
+                                className={`
+                                    relative group w-full py-2 rounded-2xl border-2 flex items-center justify-center space-x-3 transition-all shadow-sm
+                                    ${track.isArmed 
+                                        ? 'bg-red-500 border-red-600 text-white shadow-red-200 animate-pulse' 
+                                        : 'bg-white border-gray-200 text-gray-600 hover:border-red-400 hover:text-red-500 hover:shadow-md'
+                                    }
+                                `}
                                 title={track.isArmed ? "LISTO PARA GRABAR" : "ACTIVAR GRABACIÓN"}
                             >
-                                <CircleDot size={28} fill={track.isArmed ? "white" : "transparent"}/>
+                                <CircleDot size={24} fill={track.isArmed ? "currentColor" : "none"} className={track.isArmed ? "animate-ping absolute opacity-20" : ""}/>
+                                <CircleDot size={24} fill={track.isArmed ? "currentColor" : "none"} className="relative z-10"/>
+                                <span className="font-bold text-sm uppercase tracking-wider relative z-10">
+                                    {track.isArmed ? 'GRABANDO...' : 'GRABAR'}
+                                </span>
                             </button>
-                            <span className={`text-[9px] font-bold mt-1 uppercase ${track.isArmed ? 'text-red-300 animate-pulse' : 'text-gray-400'}`}>
-                                {track.isArmed ? 'Armado' : 'Grabar'}
-                            </span>
                         </div>
                     )}
                 </div>
-
-                <h3 className="font-fredoka text-lg font-bold text-white shadow-sm truncate w-full text-center mb-1">{track.name}</h3>
                 
-                <div className="w-full px-4">
-                    <input 
-                        type="range" min="0" max="100" value={track.volume} 
-                        onChange={(e) => { e.stopPropagation(); onVolumeChange(track.id, parseInt(e.target.value)) }}
-                        className="w-full h-2 rounded-lg appearance-none bg-white/30 cursor-pointer"
-                    />
+                {/* Bottom Row: Volume Slider */}
+                <div className="px-5 pb-4 pt-1 flex items-center space-x-3">
+                    <Volume2 size={18} className="text-gray-400"/>
+                    <div className="flex-1 h-3 bg-gray-200 rounded-full relative overflow-hidden">
+                        <div 
+                            className={`absolute top-0 left-0 h-full rounded-full ${track.color.replace('bg-', 'bg-')}`} 
+                            style={{width: `${track.volume}%`}}
+                        ></div>
+                        <input 
+                            type="range" min="0" max="100" value={track.volume} 
+                            onChange={(e) => { e.stopPropagation(); onVolumeChange(track.id, parseInt(e.target.value)) }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                    </div>
                 </div>
 
-                <button onClick={(e) => { e.stopPropagation(); onDelete(track.id) }} className="absolute top-2 right-2 p-1.5 rounded-full bg-white/20 text-white hover:bg-red-500/80 transition-colors"><Trash2 size={16}/></button>
             </div>
             
-            <div className="flex-1 relative flex items-center bg-black/5" ref={containerRef} style={widthStyle}>
+            {/* WAVEFORM / MIDI AREA */}
+            <div className="flex-1 relative flex items-center bg-white overflow-hidden" ref={containerRef} style={widthStyle}>
                 {track.type === 'MIDI' ? renderMidiContent() : renderAudioContent()}
             </div>
         </div>
       );
   }
 
-  // Maker/Pro Mode
+  // --- MAKER / PRO MODE (Darker, Techy) ---
   return (
       <div onClick={() => onSelect(track.id)} className={`flex w-full ${containerClass} overflow-hidden group transition-all cursor-pointer ${isSelectedClass} shrink-0`}>
          <div className={`w-64 ${stickyHeaderStyle} bg-[#1e1e1e] border-r border-black text-gray-300 flex flex-col p-2 justify-between relative flex-shrink-0`}>
