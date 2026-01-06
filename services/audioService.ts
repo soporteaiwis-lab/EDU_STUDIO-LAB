@@ -1,3 +1,4 @@
+
 import * as Tone from 'tone';
 import { ChordEvent, DrumEvent, MelodyEvent, MidiInstrumentName, MidiNote, AudioDevice } from '../types';
 
@@ -57,6 +58,11 @@ class AudioService {
   constructor() { }
 
   async initialize() {
+    // FORCE RESUME CONTEXT if suspended (Browsers block audio until gesture)
+    if (Tone.context.state === 'suspended') {
+        await Tone.context.resume();
+    }
+    
     if (this.isInitialized && Tone.context.state === 'running') return;
     await Tone.start();
     
@@ -68,7 +74,10 @@ class AudioService {
         this.setMetronomeVolume(this.metronomeVolumeValue);
 
         // Preview Synth (Fallback)
-        this.previewSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+        this.previewSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+        }).toDestination();
         this.previewSynth.volume.value = -6;
 
         this.recorder = new Tone.Recorder();
@@ -153,16 +162,29 @@ class AudioService {
   setMidiRecordingState(isRecording: boolean) { this.isRecordingMidi = isRecording; if (!isRecording) this.activeNotes.clear(); }
   setSustain(enabled: boolean) { this.sustainEnabled = enabled; }
 
-  triggerMidiNoteOn(midiVal: number, velocity: number) {
+  async triggerMidiNoteOn(midiVal: number, velocity: number) {
+      // Ensure audio context is ready
+      if (Tone.context.state !== 'running') await this.initialize();
+
       const noteName = Tone.Frequency(midiVal, "midi").toNote();
       if (this.onMidiNoteActive) this.onMidiNoteActive(midiVal, velocity);
+      
       const now = Tone.now();
+      
+      // Try to play on active track, otherwise fallback to preview synth
+      let played = false;
       if (this.activeMidiTrackId) {
           const ch = this.channels.get(this.activeMidiTrackId);
-          if (ch && ch.synth) ch.synth.triggerAttack(noteName, now, velocity);
-      } else {
+          if (ch && ch.synth) {
+              ch.synth.triggerAttack(noteName, now, velocity);
+              played = true;
+          }
+      } 
+      
+      if (!played) {
           this.previewSynth?.triggerAttack(noteName, now, velocity);
       }
+
       if (this.isRecordingMidi && this.activeMidiTrackId) {
           this.activeNotes.set(midiVal, { startTime: Tone.Transport.seconds, velocity: velocity });
       }
@@ -172,19 +194,25 @@ class AudioService {
       const noteName = Tone.Frequency(midiVal, "midi").toNote();
       if (this.onMidiNoteActive) this.onMidiNoteActive(midiVal, 0);
       const now = Tone.now();
+      
+      // Determine where to release note
+      const useTrackSynth = this.activeMidiTrackId && this.channels.get(this.activeMidiTrackId)?.synth;
+
       if (!this.sustainEnabled) {
-        if (this.activeMidiTrackId) {
-            const ch = this.channels.get(this.activeMidiTrackId);
-            if (ch && ch.synth) ch.synth.triggerRelease(noteName, now);
+        if (useTrackSynth) {
+            const ch = this.channels.get(this.activeMidiTrackId!);
+            ch?.synth?.triggerRelease(noteName, now);
         } else {
             this.previewSynth?.triggerRelease(noteName, now);
         }
       } else {
-          if (this.activeMidiTrackId) {
-              const ch = this.channels.get(this.activeMidiTrackId);
-              if (ch && ch.synth) ch.synth.triggerRelease(noteName, now + 1); 
+          // Sustain logic: release later
+          if (useTrackSynth) {
+              const ch = this.channels.get(this.activeMidiTrackId!);
+              ch?.synth?.triggerRelease(noteName, now + 1); 
           }
       }
+
       if (this.isRecordingMidi && this.activeMidiTrackId && this.activeNotes.has(midiVal)) {
           const startData = this.activeNotes.get(midiVal)!;
           const duration = Tone.Transport.seconds - startData.startTime;
@@ -264,8 +292,11 @@ class AudioService {
 
   rewind(seconds: number) { this.setTime(Math.max(0, Tone.Transport.seconds - seconds)); }
   seekToStart() { this.setTime(0); }
-  setTime(seconds: number) { Tone.Transport.seconds = seconds; this.currentBeat = Math.floor(seconds / (60/this.bpm)); }
-  previewNote(note: string) { if (!this.isInitialized) this.initialize(); this.previewSynth?.triggerAttackRelease(note, "8n"); }
+  setTime(seconds: number) { Tone.Transport.seconds = seconds; this.currentBeat = 0; }
+  previewNote(note: string) { 
+      if (!this.isInitialized) this.initialize(); 
+      this.previewSynth?.triggerAttackRelease(note, "8n"); 
+  }
   previewChord(chordName: string) { if (!this.isInitialized) this.initialize(); const notes = this.chordMap[chordName]; if (notes) this.previewSynth?.triggerAttackRelease(notes, "4n"); }
 
   async addTrack(id: string, urlOrType: string, type: 'AUDIO' | 'INSTRUMENT' | 'DRUMS' | 'SAMPLER' = 'AUDIO'): Promise<void> {
